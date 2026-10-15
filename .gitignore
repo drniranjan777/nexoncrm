@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+storage/
+*.log
+coverage
+storage-test/
+
+# Local credential notes, never commit
+posgreqlcredebtila.txt
+*.credentials.txt

@@ -1,0 +1,1434 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Platform ─────────────────────────
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
+model Plan {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  priceMonthly Decimal  @default(0) @db.Decimal(14, 2)
+  maxUsers     Int      @default(5)
+  maxCustomers Int      @default(500)
+  storageMb    Int      @default(1024)
+  aiRequests   Int      @default(200)
+  modules      String[]
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  tenants      Tenant[]
+}
+
+model Tenant {
+  id                     String       @id @default(cuid())
+  name                   String
+  slug                   String       @unique
+  status                 TenantStatus @default(TRIAL)
+  planId                 String?
+  plan                   Plan?        @relation(fields: [planId], references: [id])
+  trialEndsAt            DateTime?
+  currentPeriodEnd       DateTime?
+  legalName              String?
+  email                  String?
+  phone                  String?
+  website                String?
+  addressLine1           String?
+  addressLine2           String?
+  city                   String?
+  state                  String?
+  stateCode              String? // GST state code, e.g. "27" Maharashtra
+  postalCode             String?
+  country                String       @default("India")
+  gstin                  String?
+  pan                    String?
+  logoFileId             String?
+  brandColor             String       @default("#1e3a8a")
+  /// Base (reporting) currency: GST returns and reports are stated in it. Documents may use other currencies.
+  currency               String       @default("INR")
+  /// Currency pre-selected on new quotes and invoices. Changing it never alters existing documents.
+  defaultCurrency        String       @default("INR")
+  /// Company seal and authorized signature (private files, PNG, entityType "authorization").
+  sealFileId             String?
+  signatureFileId        String?
+  signatoryName          String?
+  signatoryDesignation   String?
+  showSignatureOnInvoice Boolean      @default(true)
+  showSealOnInvoice      Boolean      @default(true)
+  showSignatureOnQuote   Boolean      @default(true)
+  showSealOnQuote        Boolean      @default(true)
+  /// Public numeric organization ID shown to users (like an account number).
+  orgCode                String?      @unique
+  fiscalYearStartMonth   Int          @default(4) // April, Indian financial year
+  settings               Json         @default("{}")
+  storageUsedBytes       BigInt       @default(0)
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  memberships        Membership[]
+  currencies         TenantCurrency[]
+  exchangeRates      ExchangeRate[]
+  recurringProfiles  RecurringProfile[]
+  expenses           Expense[]
+  expenseCategories  ExpenseCategory[]
+  timeEntries        TimeEntry[]
+  paymentAllocations PaymentAllocation[]
+  refunds            PaymentRefund[]
+  roles              Role[]
+  invitations        Invitation[]
+  customers          Customer[]
+  contacts           Contact[]
+  leads              Lead[]
+  activities         Activity[]
+  tasks              Task[]
+  projects           Project[]
+  milestones         Milestone[]
+  feedback           Feedback[]
+  feedbackLinks      FeedbackLink[]
+  tickets            Ticket[]
+  ticketCats         TicketCategory[]
+  articles           KnowledgeArticle[]
+  files              FileObject[]
+  products           Product[]
+  quotations         Quotation[]
+  proformaInvoices   ProformaInvoice[]
+  taxRates           TaxRate[]
+  emailLogs          EmailLog[]
+  invoices           Invoice[]
+  payments           Payment[]
+  creditNotes        CreditNote[]
+  sequences          DocumentSequence[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  aiUsage            AiUsage[]
+  onboarding         OnboardingItem[]
+}
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+/// Global catalog of supported currencies, managed by the platform (super) admin.
+model Currency {
+  code      String   @id // ISO 4217, e.g. "INR"
+  name      String
+  symbol    String
+  /// Minor-unit digits used for display and rounding (0-2; amounts are stored with 2 decimals).
+  decimals  Int      @default(2)
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenants TenantCurrency[]
+}
+
+/// Currencies a tenant has enabled for its documents.
+model TenantCurrency {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  currencyCode String
+  currency     Currency @relation(fields: [currencyCode], references: [code])
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@unique([tenantId, currencyCode])
+}
+
+/// Exchange rates a tenant has used: 1 unit of currencyCode = rate units of the base currency.
+model ExchangeRate {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  currencyCode String
+  baseCurrency String
+  rate         Decimal  @db.Decimal(18, 8)
+  rateDate     DateTime
+  source       String   @default("manual") // manual | conversion
+  createdById  String?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, currencyCode, rateDate])
+}
+
+// ───────────────────────── Identity ─────────────────────────
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String
+  passwordHash    String
+  isSuperAdmin    Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  defaultTenantId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sessions    Session[]
+  resetTokens PasswordResetToken[]
+  memberships Membership[]
+}
+
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  userAgent  String?
+  ip         String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  key         String
+  name        String
+  description String?
+  permissions String[]
+  isSystem    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+  invitations Invitation[]
+
+  @@unique([tenantId, key])
+}
+
+enum MembershipStatus {
+  ACTIVE
+  DISABLED
+}
+
+model Membership {
+  id         String           @id @default(cuid())
+  tenantId   String
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId     String
+  role       Role             @relation(fields: [roleId], references: [id])
+  status     MembershipStatus @default(ACTIVE)
+  customerId String? // set for portal (Customer role) users
+  title      String?
+  createdAt  DateTime         @default(now())
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email       String
+  roleId      String
+  role        Role      @relation(fields: [roleId], references: [id])
+  customerId  String?
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  invitedById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, email])
+}
+
+// ───────────────────────── Customers ─────────────────────────
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECT
+}
+
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Customer {
+  id                  String           @id @default(cuid())
+  tenantId            String
+  tenant              Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code                String
+  /// Display name used on documents and lists.
+  name                String
+  customerType        String           @default("BUSINESS") // BUSINESS | INDIVIDUAL
+  salutation          String?
+  firstName           String?
+  lastName            String?
+  company             String?
+  email               String?
+  phone               String? // work phone
+  mobile              String?
+  website             String?
+  currency            String           @default("INR")
+  language            String           @default("en")
+  gstTreatment        String? // REGISTERED_REGULAR | REGISTERED_COMPOSITION | UNREGISTERED | CONSUMER | OVERSEAS | SEZ | DEEMED_EXPORT
+  gstin               String?
+  pan                 String?
+  taxPreference       String           @default("TAXABLE") // TAXABLE | EXEMPT
+  exemptionReason     String?
+  paymentTerms        String           @default("DUE_ON_RECEIPT")
+  billingAttention    String?
+  billingAddress      String?
+  city                String?
+  state               String?
+  stateCode           String?
+  postalCode          String?
+  country             String           @default("India")
+  shippingAttention   String?
+  shippingAddress     String?
+  shippingCity        String?
+  shippingState       String?
+  shippingPostalCode  String?
+  shippingCountry     String?
+  customFields        Json             @default("{}")
+  status              CustomerStatus   @default(ACTIVE)
+  onboardingStatus    OnboardingStatus @default(NOT_STARTED)
+  ownerId             String?
+  notes               String?
+  convertedFromLeadId String?          @unique
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  contacts          Contact[]
+  projects          Project[]
+  feedback          Feedback[]
+  tickets           Ticket[]
+  proformaInvoices  ProformaInvoice[]
+  quotations        Quotation[]
+  invoices          Invoice[]
+  activities        Activity[]
+  onboarding        OnboardingItem[]
+  tasks             Task[]
+  payments          Payment[]
+  recurringProfiles RecurringProfile[]
+  expenses          Expense[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, name])
+  @@index([tenantId, email])
+}
+
+model Contact {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name        String
+  email       String?
+  phone       String?
+  designation String?
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, customerId])
+}
+
+model OnboardingItem {
+  id         String    @id @default(cuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  title      String
+  sortOrder  Int       @default(0)
+  doneAt     DateTime?
+  doneById   String?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId, customerId])
+}
+
+// ───────────────────────── CRM ─────────────────────────
+
+enum LeadStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  MEETING_SCHEDULED
+  PROPOSAL_SENT
+  NEGOTIATION
+  WON
+  LOST
+  ON_HOLD
+}
+
+model Lead {
+  id                 String    @id @default(cuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name               String
+  company            String?
+  email              String?
+  phone              String?
+  source             String?
+  serviceInterest    String?
+  budgetRange        String?
+  estimatedValue     Decimal?  @db.Decimal(14, 2)
+  expectedDecisionAt DateTime?
+  assignedToId       String?
+  stage              LeadStage @default(NEW)
+  lastContactAt      DateTime?
+  nextFollowUpAt     DateTime?
+  proposalStatus     String?
+  notes              String?
+  lostReason         String?
+  convertedAt        DateTime?
+  customerId         String?
+  score              Int       @default(0)
+  scoreDetails       Json      @default("{}")
+  scoredAt           DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  activities Activity[]
+  tasks      Task[]
+  quotations Quotation[]
+
+  @@index([tenantId, stage])
+  @@index([tenantId, email])
+  @@index([tenantId, assignedToId])
+}
+
+enum ActivityType {
+  NOTE
+  CALL
+  EMAIL
+  MEETING
+  WHATSAPP
+  STAGE_CHANGE
+  SYSTEM
+}
+
+model Activity {
+  id         String       @id @default(cuid())
+  tenantId   String
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type       ActivityType
+  subject    String
+  body       String?
+  leadId     String?
+  lead       Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customerId String?
+  customer   Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  occurredAt DateTime     @default(now())
+  completed  Boolean      @default(true)
+  userId     String?
+  createdAt  DateTime     @default(now())
+
+  @@index([tenantId, leadId])
+  @@index([tenantId, customerId])
+}
+
+// ───────────────────────── Projects & Tasks ─────────────────────────
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+model Project {
+  id              String        @id @default(cuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code            String
+  name            String
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+  serviceCategory String?
+  status          ProjectStatus @default(PLANNING)
+  description     String?
+  startDate       DateTime?
+  dueDate         DateTime?
+  budget          Decimal?      @db.Decimal(14, 2)
+  managerId       String?
+  billingMethod   String        @default("FIXED") // FIXED | PROJECT_HOURS (one hourly rate)
+  hourlyRate      Decimal?      @db.Decimal(14, 2)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  proformaInvoices  ProformaInvoice[]
+  quotations        Quotation[]
+  timeEntries       TimeEntry[]
+  expenses          Expense[]
+  recurringProfiles RecurringProfile[]
+  members           ProjectMember[]
+  milestones        Milestone[]
+  tasks             Task[]
+  feedback          Feedback[]
+  tickets           Ticket[]
+  invoices          Invoice[]
+  feedbackLinks     FeedbackLink[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, customerId])
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  role      String?
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+}
+
+model Milestone {
+  id        String          @id @default(cuid())
+  tenantId  String
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  dueDate   DateTime?
+  status    MilestoneStatus @default(PENDING)
+  createdAt DateTime        @default(now())
+  tasks     Task[]
+
+  @@index([tenantId, projectId])
+}
+
+enum TaskType {
+  GENERAL
+  FOLLOW_UP
+  PROJECT
+  FEEDBACK
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  type        TaskType   @default(GENERAL)
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  dueDate     DateTime?
+  assigneeId  String?
+  createdById String?
+  projectId   String?
+  project     Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestoneId String?
+  milestone   Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  leadId      String?
+  lead        Lead?      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customerId  String?
+  customer    Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  feedbackId  String?
+  feedback    Feedback?  @relation(fields: [feedbackId], references: [id], onDelete: SetNull)
+  automated   Boolean    @default(false)
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([tenantId, assigneeId, status])
+  @@index([tenantId, projectId])
+  @@index([tenantId, type, dueDate])
+}
+
+// ───────────────────────── Feedback ─────────────────────────
+
+enum FeedbackStatus {
+  NEW
+  UNDER_REVIEW
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_FOR_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+model FeedbackLink {
+  id              String    @id @default(cuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  token           String    @unique
+  projectId       String?
+  project         Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  customerId      String?
+  serviceCategory String?
+  expiresAt       DateTime?
+  active          Boolean   @default(true)
+  useCount        Int       @default(0)
+  createdById     String?
+  createdAt       DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+model Feedback {
+  id                  String         @id @default(cuid())
+  tenantId            String
+  tenant              Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  referenceNo         String
+  trackingTokenHash   String         @unique
+  customerId          String?
+  customer            Customer?      @relation(fields: [customerId], references: [id])
+  projectId           String?
+  project             Project?       @relation(fields: [projectId], references: [id])
+  linkId              String?
+  submittedByUserId   String?
+  name                String
+  company             String?
+  email               String
+  phone               String?
+  serviceCategory     String
+  projectStatus       String?
+  ratingOverall       Int
+  ratingCommunication Int?
+  ratingQuality       Int?
+  ratingTimeliness    Int?
+  ratingTechnical     Int?
+  serviceAnswers      Json           @default("{}")
+  workingWell         String?
+  needsImprovement    String?
+  requestedChanges    String?
+  urgentIssues        String?
+  expectationStatus   String?
+  comments            String?
+  status              FeedbackStatus @default(NEW)
+  assignedToId        String?
+  sentiment           String?
+  sentimentScore      Float?
+  aiCategories        String[]
+  isUrgent            Boolean        @default(false)
+  resolvedAt          DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  events FeedbackEvent[]
+  tasks  Task[]
+
+  @@unique([tenantId, referenceNo])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+}
+
+model FeedbackEvent {
+  id         String   @id @default(cuid())
+  feedbackId String
+  feedback   Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
+  kind       String // NOTE | REPLY | STATUS | ASSIGN | SYSTEM
+  body       String?
+  isInternal Boolean  @default(true)
+  meta       Json     @default("{}")
+  userId     String?
+  createdAt  DateTime @default(now())
+
+  @@index([feedbackId])
+}
+
+// ───────────────────────── Support ─────────────────────────
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+model TicketCategory {
+  id        String             @id @default(cuid())
+  tenantId  String
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  slaHours  Int                @default(48)
+  createdAt DateTime           @default(now())
+  tickets   Ticket[]
+  articles  KnowledgeArticle[]
+
+  @@unique([tenantId, name])
+}
+
+model Ticket {
+  id          String          @id @default(cuid())
+  tenantId    String
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number      String
+  subject     String
+  description String
+  customerId  String?
+  customer    Customer?       @relation(fields: [customerId], references: [id])
+  projectId   String?
+  project     Project?        @relation(fields: [projectId], references: [id])
+  categoryId  String?
+  category    TicketCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  priority    Priority        @default(MEDIUM)
+  status      TicketStatus    @default(OPEN)
+  assigneeId  String?
+  createdById String?
+  feedbackId  String?
+  dueAt       DateTime?
+  resolvedAt  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  comments    TicketComment[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@index([tenantId, assigneeId])
+}
+
+model TicketComment {
+  id         String   @id @default(cuid())
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  body       String
+  isInternal Boolean  @default(false)
+  userId     String?
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+model KnowledgeArticle {
+  id         String          @id @default(cuid())
+  tenantId   String
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title      String
+  slug       String
+  body       String
+  categoryId String?
+  category   TicketCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  published  Boolean         @default(false)
+  authorId   String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([tenantId, slug])
+}
+
+// ───────────────────────── Files ─────────────────────────
+
+model FileObject {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  storageKey   String   @unique
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  entityType   String? // project | customer | ticket | feedback | invoice | general
+  entityId     String?
+  visibility   String   @default("internal") // internal | customer
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, entityType, entityId])
+}
+
+// ───────────────────────── Finance ─────────────────────────
+
+model Product {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  type          String   @default("SERVICE") // SERVICE | GOODS
+  sku           String?
+  hsnSac        String?
+  unit          String   @default("Nos")
+  rate          Decimal  @db.Decimal(14, 2)
+  taxPreference String   @default("TAXABLE") // TAXABLE | EXEMPT
+  taxRate       Decimal  @default(18) @db.Decimal(5, 2)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, name])
+}
+
+model DocumentSequence {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type     String // QUOTATION | INVOICE | CREDIT_NOTE | TICKET | FEEDBACK | CUSTOMER | PROJECT | PAYMENT
+  prefix   String
+  next     Int    @default(1)
+  padding  Int    @default(4)
+
+  @@unique([tenantId, type])
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+model Quotation {
+  id                 String          @id @default(cuid())
+  tenantId           String
+  tenant             Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number             String
+  referenceNumber    String?
+  customerId         String?
+  customer           Customer?       @relation(fields: [customerId], references: [id])
+  leadId             String?
+  lead               Lead?           @relation(fields: [leadId], references: [id])
+  projectId          String?
+  project            Project?        @relation(fields: [projectId], references: [id])
+  salespersonId      String?
+  subject            String?
+  status             QuotationStatus @default(DRAFT)
+  issueDate          DateTime        @default(now())
+  validUntil         DateTime?
+  placeOfSupply      String?
+  isInterState       Boolean         @default(false)
+  subtotal           Decimal         @default(0) @db.Decimal(14, 2)
+  discountType       String          @default("PERCENT") // PERCENT | AMOUNT (document-level, applied before tax)
+  discountValue      Decimal         @default(0) @db.Decimal(14, 2)
+  discountTotal      Decimal         @default(0) @db.Decimal(14, 2)
+  taxableTotal       Decimal         @default(0) @db.Decimal(14, 2)
+  cgstTotal          Decimal         @default(0) @db.Decimal(14, 2)
+  sgstTotal          Decimal         @default(0) @db.Decimal(14, 2)
+  igstTotal          Decimal         @default(0) @db.Decimal(14, 2)
+  /// Tax components other than CGST/SGST/IGST (e.g. cess), included in the total.
+  otherTaxTotal      Decimal         @default(0) @db.Decimal(14, 2)
+  /// Tax summary by component and rate, frozen with the document: [{ name, rate, taxable, amount }].
+  taxBreakdown       Json?
+  withholdingType    String? // TDS | TCS
+  withholdingRate    Decimal         @default(0) @db.Decimal(5, 2)
+  withholdingAmount  Decimal         @default(0) @db.Decimal(14, 2)
+  adjustmentLabel    String?
+  adjustment         Decimal         @default(0) @db.Decimal(14, 2)
+  roundOff           Decimal         @default(0) @db.Decimal(14, 2)
+  total              Decimal         @default(0) @db.Decimal(14, 2)
+  /// Document currency and its rate to the tenant's base currency (1 unit = exchangeRate base units).
+  currency           String          @default("INR")
+  exchangeRate       Decimal         @default(1) @db.Decimal(18, 8)
+  /// Seal/signature details frozen when the quote is sent, so later changes don't alter it.
+  authorization      Json?
+  notes              String?
+  terms              String?
+  sentAt             DateTime?
+  convertedInvoiceId String?
+  createdById        String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  items              QuotationItem[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+}
+
+model QuotationItem {
+  id             String    @id @default(cuid())
+  quotationId    String
+  quotation      Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  productId      String?
+  description    String
+  hsnSac         String?
+  quantity       Decimal   @db.Decimal(12, 3)
+  unit           String?
+  rate           Decimal   @db.Decimal(14, 2)
+  discountPct    Decimal   @default(0) @db.Decimal(5, 2)
+  taxRate        Decimal   @db.Decimal(5, 2)
+  taxable        Decimal   @db.Decimal(14, 2)
+  taxAmount      Decimal   @db.Decimal(14, 2)
+  amount         Decimal   @db.Decimal(14, 2)
+  /// Fixed discount for the whole line (used instead of discountPct when set).
+  discountAmount Decimal   @default(0) @db.Decimal(14, 2)
+  /// Tax configuration chosen for the line, with its name and components frozen at the time of saving.
+  taxRateId      String?
+  taxName        String?
+  taxComponents  Json?
+  sortOrder      Int       @default(0)
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+  WRITTEN_OFF
+}
+
+model Invoice {
+  id                 String              @id @default(cuid())
+  tenantId           String
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number             String? // assigned on issue
+  orderNumber        String?
+  customerId         String
+  customer           Customer            @relation(fields: [customerId], references: [id])
+  projectId          String?
+  project            Project?            @relation(fields: [projectId], references: [id])
+  quotationId        String?             @unique
+  /// Proforma invoice this invoice was converted from (one invoice per proforma).
+  proformaInvoiceId  String?             @unique
+  recurringProfileId String?
+  recurringProfile   RecurringProfile?   @relation(fields: [recurringProfileId], references: [id], onDelete: SetNull)
+  salespersonId      String?
+  subject            String?
+  status             InvoiceStatus       @default(DRAFT)
+  issueDate          DateTime            @default(now())
+  paymentTerms       String              @default("DUE_ON_RECEIPT")
+  dueDate            DateTime?
+  placeOfSupply      String?
+  isInterState       Boolean             @default(false)
+  subtotal           Decimal             @default(0) @db.Decimal(14, 2)
+  discountType       String              @default("PERCENT")
+  discountValue      Decimal             @default(0) @db.Decimal(14, 2)
+  discountTotal      Decimal             @default(0) @db.Decimal(14, 2)
+  taxableTotal       Decimal             @default(0) @db.Decimal(14, 2)
+  cgstTotal          Decimal             @default(0) @db.Decimal(14, 2)
+  sgstTotal          Decimal             @default(0) @db.Decimal(14, 2)
+  igstTotal          Decimal             @default(0) @db.Decimal(14, 2)
+  /// Tax components other than CGST/SGST/IGST (e.g. cess), included in the total.
+  otherTaxTotal      Decimal             @default(0) @db.Decimal(14, 2)
+  /// Tax summary by component and rate, frozen with the document: [{ name, rate, taxable, amount }].
+  taxBreakdown       Json?
+  withholdingType    String?
+  withholdingRate    Decimal             @default(0) @db.Decimal(5, 2)
+  withholdingAmount  Decimal             @default(0) @db.Decimal(14, 2)
+  adjustmentLabel    String?
+  adjustment         Decimal             @default(0) @db.Decimal(14, 2)
+  roundOff           Decimal             @default(0) @db.Decimal(14, 2)
+  total              Decimal             @default(0) @db.Decimal(14, 2)
+  amountPaid         Decimal             @default(0) @db.Decimal(14, 2)
+  creditedTotal      Decimal             @default(0) @db.Decimal(14, 2)
+  writeOffAmount     Decimal             @default(0) @db.Decimal(14, 2)
+  balanceDue         Decimal             @default(0) @db.Decimal(14, 2)
+  currency           String              @default("INR")
+  exchangeRate       Decimal             @default(1) @db.Decimal(18, 8)
+  /// Seal/signature details frozen when the invoice is issued.
+  authorization      Json?
+  emailRecipients    String[]
+  notes              String?
+  terms              String?
+  issuedAt           DateTime?
+  lastEmailedAt      DateTime?
+  writtenOffAt       DateTime?
+  cancelledAt        DateTime?
+  cancelReason       String?
+  createdById        String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  items              InvoiceItem[]
+  payments           Payment[]
+  allocations        PaymentAllocation[]
+  creditNotes        CreditNote[]
+  timeEntries        TimeEntry[]
+  expenses           Expense[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@index([tenantId, customerId])
+}
+
+model InvoiceItem {
+  id             String  @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId      String?
+  description    String
+  hsnSac         String?
+  quantity       Decimal @db.Decimal(12, 3)
+  unit           String?
+  rate           Decimal @db.Decimal(14, 2)
+  discountPct    Decimal @default(0) @db.Decimal(5, 2)
+  taxRate        Decimal @db.Decimal(5, 2)
+  taxable        Decimal @db.Decimal(14, 2)
+  taxAmount      Decimal @db.Decimal(14, 2)
+  amount         Decimal @db.Decimal(14, 2)
+  /// Fixed discount for the whole line (used instead of discountPct when set).
+  discountAmount Decimal @default(0) @db.Decimal(14, 2)
+  /// Tax configuration chosen for the line, with its name and components frozen at the time of saving.
+  taxRateId      String?
+  taxName        String?
+  taxComponents  Json?
+  sortOrder      Int     @default(0)
+}
+
+/// A customer payment. It can be split across several invoices (allocations); any remainder is
+/// the customer's unused credit, which can later be applied to invoices or refunded.
+model Payment {
+  id             String              @id @default(cuid())
+  tenantId       String
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number         String
+  customerId     String?
+  customer       Customer?           @relation(fields: [customerId], references: [id])
+  /// Primary invoice (legacy single-invoice payments). Allocations are authoritative.
+  invoiceId      String?
+  invoice        Invoice?            @relation(fields: [invoiceId], references: [id])
+  amount         Decimal             @db.Decimal(14, 2)
+  bankCharges    Decimal             @default(0) @db.Decimal(14, 2)
+  taxDeducted    Decimal             @default(0) @db.Decimal(14, 2) // TDS withheld by the customer, counted toward invoices
+  unusedAmount   Decimal             @default(0) @db.Decimal(14, 2)
+  refundedAmount Decimal             @default(0) @db.Decimal(14, 2)
+  currency       String              @default("INR")
+  exchangeRate   Decimal             @default(1) @db.Decimal(18, 8)
+  paidAt         DateTime
+  method         String // BANK_TRANSFER | UPI | CARD | CASH | CHEQUE | OTHER
+  reference      String?
+  notes          String?
+  recordedById   String?
+  createdAt      DateTime            @default(now())
+  allocations    PaymentAllocation[]
+  refunds        PaymentRefund[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, customerId])
+}
+
+model PaymentAllocation {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  amount    Decimal  @db.Decimal(14, 2)
+  appliedAt DateTime @default(now())
+
+  @@index([tenantId, invoiceId])
+  @@index([paymentId])
+}
+
+model PaymentRefund {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  paymentId   String
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  amount      Decimal  @db.Decimal(14, 2)
+  refundedAt  DateTime
+  method      String
+  reference   String?
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, refundedAt])
+}
+
+enum RecurrenceFrequency {
+  WEEK
+  TWO_WEEKS
+  MONTH
+  TWO_MONTHS
+  THREE_MONTHS
+  SIX_MONTHS
+  YEAR
+  TWO_YEARS
+  THREE_YEARS
+}
+
+enum RecurringStatus {
+  ACTIVE
+  STOPPED
+  EXPIRED
+}
+
+model RecurringProfile {
+  id              String              @id @default(cuid())
+  tenantId        String
+  tenant          Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profileName     String
+  customerId      String
+  customer        Customer            @relation(fields: [customerId], references: [id])
+  projectId       String?
+  project         Project?            @relation(fields: [projectId], references: [id])
+  orderNumber     String?
+  frequency       RecurrenceFrequency @default(MONTH)
+  startDate       DateTime
+  endDate         DateTime? // null = never expires
+  nextRunDate     DateTime
+  lastRunDate     DateTime?
+  paymentTerms    String              @default("DUE_ON_RECEIPT")
+  salespersonId   String?
+  subject         String?
+  placeOfSupply   String?
+  discountType    String              @default("PERCENT")
+  discountValue   Decimal             @default(0) @db.Decimal(14, 2)
+  withholdingType String?
+  withholdingRate Decimal             @default(0) @db.Decimal(5, 2)
+  adjustmentLabel String?
+  adjustment      Decimal             @default(0) @db.Decimal(14, 2)
+  items           Json // line items in the same shape as invoice lines
+  currency        String              @default("INR")
+  /// Rate used for generated invoices unless a newer rate for the currency has been recorded.
+  exchangeRate    Decimal             @default(1) @db.Decimal(18, 8)
+  notes           String?
+  terms           String?
+  createAs        String              @default("DRAFT") // DRAFT | SEND (issue and email)
+  status          RecurringStatus     @default(ACTIVE)
+  createdById     String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  invoices        Invoice[]
+
+  @@index([tenantId, status, nextRunDate])
+}
+
+model ExpenseCategory {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime  @default(now())
+  expenses  Expense[]
+
+  @@unique([tenantId, name])
+}
+
+model Expense {
+  id          String           @id @default(cuid())
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  date        DateTime
+  categoryId  String?
+  category    ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  amount      Decimal          @db.Decimal(14, 2) // amount before tax
+  taxRate     Decimal          @default(0) @db.Decimal(5, 2)
+  taxAmount   Decimal          @default(0) @db.Decimal(14, 2)
+  total       Decimal          @db.Decimal(14, 2)
+  paidThrough String           @default("CASH") // CASH | BANK | CARD | UPI | OTHER
+  vendor      String?
+  reference   String?
+  notes       String?
+  customerId  String?
+  customer    Customer?        @relation(fields: [customerId], references: [id])
+  projectId   String?
+  project     Project?         @relation(fields: [projectId], references: [id])
+  billable    Boolean          @default(false)
+  markupPct   Decimal          @default(0) @db.Decimal(5, 2)
+  invoiceId   String?
+  invoice     Invoice?         @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  createdById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([tenantId, date])
+  @@index([tenantId, customerId])
+}
+
+model TimeEntry {
+  id             String    @id @default(cuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId         String?
+  userId         String
+  date           DateTime
+  minutes        Int       @default(0)
+  timerStartedAt DateTime? // set while a timer is running
+  notes          String?
+  billable       Boolean   @default(true)
+  invoiceId      String?
+  invoice        Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([tenantId, projectId, date])
+  @@index([tenantId, userId, date])
+}
+
+enum CreditNoteStatus {
+  ISSUED
+  CANCELLED
+}
+
+model CreditNote {
+  id           String           @id @default(cuid())
+  tenantId     String
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number       String
+  invoiceId    String
+  invoice      Invoice          @relation(fields: [invoiceId], references: [id])
+  reason       String
+  status       CreditNoteStatus @default(ISSUED)
+  issueDate    DateTime         @default(now())
+  taxableTotal Decimal          @db.Decimal(14, 2)
+  cgstTotal    Decimal          @default(0) @db.Decimal(14, 2)
+  sgstTotal    Decimal          @default(0) @db.Decimal(14, 2)
+  igstTotal    Decimal          @default(0) @db.Decimal(14, 2)
+  total        Decimal          @db.Decimal(14, 2)
+  currency     String           @default("INR")
+  exchangeRate Decimal          @default(1) @db.Decimal(18, 8)
+  createdById  String?
+  createdAt    DateTime         @default(now())
+
+  @@unique([tenantId, number])
+  @@index([tenantId, invoiceId])
+}
+
+// ───────────────────────── Cross-cutting ─────────────────────────
+
+model Notification {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, userId, readAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String?
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  actorId    String?
+  actorEmail String?
+  action     String
+  entityType String?
+  entityId   String?
+  meta       Json     @default("{}")
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model AiUsage {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  feature   String
+  provider  String
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+// ───────────────────────── Tax configuration ─────────────────────────
+
+/// A tenant's tax configuration (e.g. "GST 18%"). Documents copy its rate and components onto each line,
+/// so later edits or deactivation never change documents already saved. Referenced rows are deactivated, not deleted.
+model TaxRate {
+  id             String    @id @default(cuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name           String
+  code           String
+  /// GST | IGST | CUSTOM | EXEMPT | NIL_RATED | ZERO_RATED
+  taxType        String    @default("GST")
+  rate           Decimal   @db.Decimal(5, 2)
+  /// Component split, each list summing to `rate`: { intra: [{ name, rate }], inter: [{ name, rate }] }.
+  /// intra applies when the place of supply is in the company's state, inter otherwise.
+  components     Json
+  jurisdiction   String    @default("IN")
+  description    String?
+  isActive       Boolean   @default(true)
+  effectiveFrom  DateTime  @default(now())
+  effectiveUntil DateTime?
+  sortOrder      Int       @default(100)
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+}
+
+// ───────────────────────── Proforma invoices ─────────────────────────
+
+enum ProformaStatus {
+  DRAFT
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+  CANCELLED
+}
+
+/// A pre-sale request for payment. It is not a tax invoice: converting it creates a draft invoice that follows
+/// the normal invoicing workflow.
+model ProformaInvoice {
+  id                 String                @id @default(cuid())
+  tenantId           String
+  tenant             Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number             String
+  /// Client reference or purchase order number.
+  referenceNumber    String?
+  /// Project or service reference printed on the document.
+  serviceReference   String?
+  customerId         String
+  customer           Customer              @relation(fields: [customerId], references: [id])
+  /// Document-specific billing details; the customer's master record is not changed.
+  billTo             Json?
+  projectId          String?
+  project            Project?              @relation(fields: [projectId], references: [id])
+  salespersonId      String?
+  subject            String?
+  status             ProformaStatus        @default(DRAFT)
+  issueDate          DateTime              @default(now())
+  validUntil         DateTime?
+  paymentTerms       String                @default("DUE_ON_RECEIPT")
+  placeOfSupply      String?
+  isInterState       Boolean               @default(false)
+  subtotal           Decimal               @default(0) @db.Decimal(14, 2)
+  discountType       String                @default("PERCENT")
+  discountValue      Decimal               @default(0) @db.Decimal(14, 2)
+  discountTotal      Decimal               @default(0) @db.Decimal(14, 2)
+  taxableTotal       Decimal               @default(0) @db.Decimal(14, 2)
+  cgstTotal          Decimal               @default(0) @db.Decimal(14, 2)
+  sgstTotal          Decimal               @default(0) @db.Decimal(14, 2)
+  igstTotal          Decimal               @default(0) @db.Decimal(14, 2)
+  otherTaxTotal      Decimal               @default(0) @db.Decimal(14, 2)
+  taxBreakdown       Json?
+  withholdingType    String?
+  withholdingRate    Decimal               @default(0) @db.Decimal(5, 2)
+  withholdingAmount  Decimal               @default(0) @db.Decimal(14, 2)
+  adjustmentLabel    String?
+  adjustment         Decimal               @default(0) @db.Decimal(14, 2)
+  roundOff           Decimal               @default(0) @db.Decimal(14, 2)
+  total              Decimal               @default(0) @db.Decimal(14, 2)
+  currency           String                @default("INR")
+  exchangeRate       Decimal               @default(1) @db.Decimal(18, 8)
+  /// Seal/signature details frozen when the proforma is sent.
+  authorization      Json?
+  emailRecipients    String[]
+  notes              String?
+  terms              String?
+  sentAt             DateTime?
+  lastEmailedAt      DateTime?
+  acceptedAt         DateTime?
+  convertedInvoiceId String?               @unique
+  convertedAt        DateTime?
+  convertedById      String?
+  cancelledAt        DateTime?
+  cancelReason       String?
+  createdById        String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  items              ProformaInvoiceItem[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+  @@index([tenantId, customerId])
+  @@index([tenantId, issueDate])
+}
+
+model ProformaInvoiceItem {
+  id                String          @id @default(cuid())
+  proformaInvoiceId String
+  proformaInvoice   ProformaInvoice @relation(fields: [proformaInvoiceId], references: [id], onDelete: Cascade)
+  productId         String?
+  description       String
+  hsnSac            String?
+  quantity          Decimal         @db.Decimal(12, 3)
+  unit              String?
+  rate              Decimal         @db.Decimal(14, 2)
+  discountPct       Decimal         @default(0) @db.Decimal(5, 2)
+  discountAmount    Decimal         @default(0) @db.Decimal(14, 2)
+  taxRate           Decimal         @db.Decimal(5, 2)
+  taxRateId         String?
+  taxName           String?
+  taxComponents     Json?
+  taxable           Decimal         @db.Decimal(14, 2)
+  taxAmount         Decimal         @db.Decimal(14, 2)
+  amount            Decimal         @db.Decimal(14, 2)
+  sortOrder         Int             @default(0)
+}
+
+// ───────────────────────── Email activity ─────────────────────────
+
+/// One outgoing document email and what is known about its delivery. SENT means the mail server accepted it;
+/// DELIVERED / BOUNCED are only set from provider delivery events, never assumed.
+model EmailLog {
+  id                String    @id @default(cuid())
+  tenantId          String
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entityType        String
+  entityId          String
+  to                String[]
+  cc                String[]
+  subject           String
+  attachments       String[]
+  /// QUEUED | SENT | DELIVERED | BOUNCED | FAILED | NOT_CONFIGURED
+  status            String    @default("QUEUED")
+  error             String?
+  providerMessageId String?
+  sentById          String?
+  sentAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([tenantId, entityType, entityId])
+}
