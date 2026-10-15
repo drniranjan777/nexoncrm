@@ -10,9 +10,9 @@ export interface ListParams {
   dir: 'asc' | 'desc';
 }
 
-export function listParams(req: Request, allowedSort: string[] = ['createdAt']): ListParams {
+export function listParams(req: Request, allowedSort: string[] = ['createdAt'], opts: { maxPageSize?: number } = {}): ListParams {
   const page = Math.max(1, Number(req.query.page) || 1);
-  const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 25));
+  const pageSize = Math.min(opts.maxPageSize ?? 200, Math.max(1, Number(req.query.pageSize) || 25));
   const q = typeof req.query.q === 'string' && req.query.q.trim() ? req.query.q.trim() : undefined;
   const sortRaw = typeof req.query.sort === 'string' ? req.query.sort : undefined;
   const sort = sortRaw && allowedSort.includes(sortRaw) ? sortRaw : allowedSort[0];

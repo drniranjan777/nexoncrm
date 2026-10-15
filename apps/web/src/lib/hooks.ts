@@ -15,21 +15,30 @@ export function useDebounced<T>(value: T, ms = 300) {
 }
 
 /** Server-paginated list with search, filters and sorting held in local state. */
-export function useList<T>(path: string, initialFilters: Record<string, string> = {}, opts: { sort?: string; dir?: 'asc' | 'desc'; pageSize?: number } = {}) {
+export function useList<T>(path: string, initialFilters: Record<string, string> = {}, opts: { sort?: string; dir?: 'asc' | 'desc'; pageSize?: number; storageKey?: string } = {}) {
   const [page, setPage] = useState(1);
+  // Rows per page, remembered per list when a storage key is given.
+  const [pageSize, setPageSizeState] = useState<number>(() => {
+    try { const v = opts.storageKey ? Number(localStorage.getItem(`nx.pageSize.${opts.storageKey}`)) : 0; return v > 0 ? v : opts.pageSize ?? 25; } catch { return opts.pageSize ?? 25; }
+  });
+  const setPageSize = (n: number) => {
+    setPageSizeState(n);
+    setPage(1);
+    try { if (opts.storageKey) localStorage.setItem(`nx.pageSize.${opts.storageKey}`, String(n)); } catch { /* private mode */ }
+  };
   const [q, setQ] = useState('');
   const [filters, setFilters] = useState<Record<string, string>>(initialFilters);
   const [sort, setSort] = useState<{ sort?: string; dir: 'asc' | 'desc' }>({ sort: opts.sort, dir: opts.dir ?? 'desc' });
   const dq = useDebounced(q);
   useEffect(() => setPage(1), [dq, JSON.stringify(filters)]);
   const query = useQuery({
-    queryKey: [path, { page, q: dq, ...filters, ...sort }],
-    queryFn: () => api.get<Paged<T> & Record<string, unknown>>(path, { page, pageSize: opts.pageSize ?? 25, q: dq, ...filters, ...sort }),
+    queryKey: [path, { page, pageSize, q: dq, ...filters, ...sort }],
+    queryFn: () => api.get<Paged<T> & Record<string, unknown>>(path, { page, pageSize, q: dq, ...filters, ...sort }),
     placeholderData: keepPreviousData,
   });
   return {
     ...query,
-    page, setPage, q, setQ, filters,
+    page, setPage, pageSize, setPageSize, q, setQ, filters,
     setFilter: (k: string, v: string) => setFilters((f) => ({ ...f, [k]: v })),
     sort, toggleSort: (s: string) => setSort((cur) => ({ sort: s, dir: cur.sort === s && cur.dir === 'desc' ? 'asc' : 'desc' })),
     params: { q: dq, ...filters },

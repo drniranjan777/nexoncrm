@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
-import { Building2, CheckCircle2, Circle, Download, Mail, Pencil, Phone, Plus, Star, Trash2 } from 'lucide-react';
+import { Building2, CheckCircle2, Circle, Download, Mail, Pencil, Phone, Plus, Star, Trash2, Upload } from 'lucide-react';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useAction, useCustomerOptions, useFinanceMeta, useList, useMembers, memberName, termsLabel } from '@/lib/hooks';
@@ -12,7 +12,7 @@ import {
   Badge, Button, Card, CardHeader, Checkbox, ConfirmDialog, DescList, Dialog, EmptyState, ErrorState, Field, Input, LoadingBlock, PageHeader, Pagination,
   Progress, SearchInput, Select, StatusBadge, Table, TBody, TD, TH, THead, Toolbar, TR, Tabs, TabsContent, TabsList, TabsTrigger, Textarea,
 } from '@/components/ui';
-import { ActivityTimeline, AssigneeSelect, ExportButton, FileManager, LogActivityDialog } from '@/components/shared';
+import { ActivityTimeline, AssigneeSelect, CsvImportDialog, ExportButton, FileManager, LogActivityDialog } from '@/components/shared';
 import { InvoiceUnbilledDialog } from './time';
 
 type CustomerForm = Partial<Omit<Customer, 'id' | 'code' | 'createdAt' | '_count'>> & { enablePortal?: boolean };
@@ -192,10 +192,21 @@ export function CustomersList() {
   const meta = useFinanceMeta();
   const list = useList<Customer>('/customers', { status: 'ACTIVE' }, { sort: 'createdAt' });
   const [creating, setCreating] = useState(params.get('new') === '1');
+  const [importing, setImporting] = useState(false);
   return (
     <>
       <PageHeader title={<span>{list.filters.status === 'ACTIVE' ? 'Active Customers' : list.filters.status === 'INACTIVE' ? 'Inactive Customers' : 'All Customers'}</span>}
-        actions={<>{can('customers.read') && <ExportButton path="/customers" filename="customers.csv" params={list.params} />}{can('customers.update') && <Button onClick={() => setCreating(true)}><Plus /> New</Button>}</>} />
+        actions={<>{can('customers.read') && <ExportButton path="/customers" filename="customers.csv" params={list.params} />}{can('customers.update') && <Button variant="secondary" onClick={() => setImporting(true)}><Upload /> Import</Button>}{can('customers.update') && <Button onClick={() => setCreating(true)}><Plus /> New</Button>}</>} />
+      <CsvImportDialog open={importing} onOpenChange={setImporting} title="Import customers from CSV" endpoint="/customers/import" noun="customer" invalidate={[['/customers'], ['customers-options']]}
+        help={<>
+          <p>Comma-, tab- or semicolon-separated, with a header row. Each row needs a <code className="text-xs">name</code> or <code className="text-xs">company</code>. Also recognised: <code className="text-xs">email, phone, mobile, gstin, pan, address, city, state, state code, pincode, country, gst treatment, payment terms, customer type, currency, website, notes</code>, and common variants such as <code className="text-xs">GST Number</code> or <code className="text-xs">Company Name</code>.</p>
+          <p>State, state code and PAN are filled in from the GSTIN. Rows whose email, GSTIN or phone already exists (or repeats in the file) are skipped. Your own customer export can be imported back.</p>
+        </>}
+        template={{ filename: 'customers-template.csv', rows: [
+          ['name', 'company', 'email', 'phone', 'mobile', 'gstin', 'gst treatment', 'address', 'city', 'state', 'pincode', 'country', 'payment terms', 'customer type', 'notes'],
+          ['Rohit Sharma', 'Acme Retail Pvt Ltd', 'rohit@example.com', '022 4000 1234', '9876543210', '27AAACA1234B1Z2', 'Registered Business - Regular', '12 MG Road', 'Mumbai', 'Maharashtra', '400001', 'India', 'Net 30', 'Business', ''],
+          ['Kavya Nair', '', 'kavya@example.com', '', '9123456780', '', 'Consumer', '', 'Bengaluru', 'Karnataka', '560001', 'India', 'Due on Receipt', 'Individual', ''],
+        ] }} />
       <Card>
         <Toolbar>
           <SearchInput value={list.q} onChange={list.setQ} placeholder="Search name, company, email, GSTIN" className="w-full sm:w-80" />

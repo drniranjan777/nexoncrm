@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Download, File as FileIcon, FileImage, FileSpreadsheet, FileText, Mail, MessageCircle, Phone, StickyNote, Trash2, Upload, Users, Repeat, Cog } from 'lucide-react';
@@ -131,6 +131,65 @@ export function LogActivityDialog({ open, onOpenChange, leadId, customerId }: { 
         <label className="flex items-center gap-2 text-sm"><Switch checked={form.completed} onCheckedChange={(v) => setForm({ ...form, completed: v })} /> Completed</label>
         {leadId && <Field label="Next follow-up" hint="Creates or updates a follow-up task"><Input type="date" value={form.nextFollowUpAt} min={toDateInput(new Date())} onChange={(e) => setForm({ ...form, nextFollowUpAt: e.target.value })} /></Field>}
       </div>
+    </Dialog>
+  );
+}
+
+// ───────────── CSV import ─────────────
+
+/** Reads a CSV as UTF-8, or as Windows-1252 (Excel's plain "CSV" on Windows) when it is not valid UTF-8. */
+async function readCsvFile(f: File) {
+  const bytes = await f.arrayBuffer();
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { return new TextDecoder('windows-1252').decode(bytes); }
+}
+
+/** Saves a header row plus example rows as a UTF-8 CSV that Excel opens correctly. */
+function downloadTemplate(filename: string, rows: string[][]) {
+  const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const blob = new Blob(['﻿' + rows.map((r) => r.map(esc).join(',')).join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+export interface ImportResult { created: number; skipped: { row: number; reason: string }[] }
+
+/**
+ * Upload a CSV (comma, tab or semicolon separated) to an import endpoint and show what was created and skipped.
+ * The template gives users a file with the expected columns.
+ */
+export function CsvImportDialog({ open, onOpenChange, title, endpoint, help, template, noun, invalidate }: {
+  open: boolean; onOpenChange: (v: boolean) => void; title: string; endpoint: string; help: ReactNode;
+  template: { filename: string; rows: string[][] }; noun: string; invalidate: string[][];
+}) {
+  const [csv, setCsv] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const file = useRef<HTMLInputElement>(null);
+  const run = useAction(() => api.post<ImportResult>(endpoint, { csv, skipDuplicates: true }), {
+    invalidate, onSuccess: (r) => { setResult(r); setCsv(''); toast.success(`${r.created} ${noun}${r.created === 1 ? '' : 's'} imported`); },
+  });
+  const rows = csv ? csv.split(/\r?\n/).filter((l) => l.trim()).length - 1 : 0;
+  return (
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) { setCsv(''); setFileName(''); setResult(null); } }} title={title} size="lg"
+      footer={<><Button variant="secondary" onClick={() => onOpenChange(false)}>Close</Button><Button onClick={() => run.mutate()} loading={run.isPending} disabled={!csv}>Import{rows > 0 ? ` ${rows} row${rows === 1 ? '' : 's'}` : ''}</Button></>}>
+      <div className="mb-3 space-y-2 text-sm text-slate-600">{help}</div>
+      <input ref={file} type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" className="hidden"
+        onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) { setCsv(await readCsvFile(f)); setFileName(f.name); setResult(null); } }} />
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={() => file.current?.click()}><Upload /> Choose CSV file</Button>
+        <Button variant="ghost" onClick={() => downloadTemplate(template.filename, template.rows)}><Download /> Download template</Button>
+      </div>
+      {csv && <p className="mt-2 text-sm text-muted">{fileName}: {rows} data row{rows === 1 ? '' : 's'} loaded</p>}
+      {result && (
+        <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
+          <p className="font-medium">{result.created} created, {result.skipped.length} skipped</p>
+          {result.skipped.length > 0 && <ul className="mt-2 max-h-48 overflow-auto text-xs text-slate-600">{result.skipped.map((s, i) => <li key={i}>Row {s.row}: {s.reason}</li>)}</ul>}
+        </div>
+      )}
     </Dialog>
   );
 }

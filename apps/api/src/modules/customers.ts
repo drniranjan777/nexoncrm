@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/db.js';
 import { audit } from '../lib/audit.js';
 import { notFound } from '../lib/errors.js';
-import { dateParam, listParams, orderBy, paged, qstr, searchAny, toCsv } from '../lib/list.js';
+import { dateParam, listParams, orderBy, paged, parseCsv, qstr, searchAny, toCsv } from '../lib/list.js';
 import { nextNumber } from '../lib/numbering.js';
 import { assertTenantRefs } from '../lib/tenantRefs.js';
 import { tenantSettings } from '../lib/tenants.js';
@@ -99,7 +99,7 @@ customersRouter.get('/customers', requirePerm('customers.read'), async (req, res
     const rows = await prisma.customer.findMany({ where, orderBy: { name: 'asc' } });
     await audit(req, { action: 'customers.export', meta: { count: rows.length } });
     res.type('text/csv').attachment('customers.csv');
-    return res.send(toCsv(rows as never, ['code', 'name', 'company', 'email', 'phone', 'gstin', 'city', 'state', 'stateCode', 'status', 'createdAt']));
+    return res.send(toCsv(rows as never, ['code', 'name', 'company', 'email', 'phone', 'mobile', 'gstin', 'billingAddress', 'city', 'state', 'stateCode', 'postalCode', 'status', 'createdAt']));
   }
   const [items, total] = await Promise.all([
     prisma.customer.findMany({
@@ -136,6 +136,142 @@ customersRouter.post('/customers', requirePerm('customers.update'), async (req, 
   await audit(req, { action: 'customers.create', entityType: 'customer', entityId: customer.id });
   const portal = enablePortal ? await invitePortalUser(req, customer) : null;
   res.status(201).json({ ...customer, portal });
+});
+
+// ── CSV import ──
+
+const normKey = (k: string) => k.toLowerCase().replace(/[^a-z]/g, '');
+const phoneKey = (phone?: string | null) => {
+  const digits = (phone ?? '').replace(/\D/g, '');
+  return digits.length >= 7 ? digits.slice(-10) : null;
+};
+/** Free-text GST treatment ("Registered", "Unregistered", "Consumer", "Overseas", "SEZ", …) to the stored value. */
+function gstTreatmentOf(v?: string) {
+  const t = normKey(v ?? '');
+  if (!t) return undefined;
+  if (t.includes('composition')) return 'REGISTERED_COMPOSITION';
+  if (t.includes('unregistered')) return 'UNREGISTERED';
+  if (t.includes('registered') || t === 'regular' || t === 'b2b') return 'REGISTERED_REGULAR';
+  if (t.includes('consumer') || t === 'b2c' || t === 'individual') return 'CONSUMER';
+  if (t.includes('overseas') || t.includes('export') || t.includes('foreign')) return 'OVERSEAS';
+  if (t.includes('sez') || t.includes('specialeconomic')) return 'SEZ';
+  if (t.includes('deemed')) return 'DEEMED_EXPORT';
+  return 'INVALID';
+}
+/** GST state code from a state name ("Karnataka", "karnataka", "New Delhi", "Telangana"…). */
+function stateCodeFromName(name: string) {
+  const k = normKey(name.replace(/^new\s+delhi$/i, 'Delhi').replace(/&/g, 'and'));
+  return Object.entries(INDIAN_STATES).find(([code, n]) => code !== '96' && code !== '97' && normKey(n.replace(/&/g, 'and')) === k)?.[0];
+}
+/** "Net 30", "net30", "Due on receipt", "NET_30" … to the payment-terms code (digits matter here). */
+function paymentTermsOf(v?: string) {
+  const key = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const t = key(v ?? '');
+  if (!t) return undefined;
+  const hit = Object.entries(PAYMENT_TERMS).find(([code, def]) => key(code) === t || key(def.label) === t);
+  return hit?.[0] ?? 'INVALID';
+}
+
+customersRouter.post('/customers/import', requirePerm('customers.update'), async (req, res) => {
+  const body = parse(z.object({ csv: z.string().min(1).max(5_000_000), skipDuplicates: z.boolean().default(true) }), req.body);
+  const rows = parseCsv(body.csv);
+  if (!rows.length) throw badRequest('The CSV file has no data rows');
+  if (rows.length > 2000) throw badRequest('Import at most 2000 rows at a time');
+  const columns = Object.keys(rows[0]);
+  const NAME = ['name', 'customername', 'displayname', 'contactname', 'fullname', 'contactperson'];
+  const COMPANY = ['company', 'companyname', 'organization', 'organisation', 'businessname', 'firmname'];
+  if (!columns.some((c) => [...NAME, ...COMPANY].includes(normKey(c)))) {
+    throw badRequest(`No "name" or "company" column found. The header row has: ${columns.slice(0, 10).map((c) => `"${c.slice(0, 40)}"`).join(', ')}. Use a comma-, tab- or semicolon-separated file whose first row names the columns.`);
+  }
+  const pick = (r: Record<string, string>, ...keys: string[]) => {
+    for (const k of keys) {
+      const hit = Object.keys(r).find((rk) => normKey(rk) === k);
+      if (hit && r[hit]?.trim()) return r[hit].trim();
+    }
+    return undefined;
+  };
+
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tid(req) }, include: { plan: true } });
+  let room = tenant.plan ? tenant.plan.maxCustomers - (await prisma.customer.count({ where: { tenantId: tid(req) } })) : Infinity;
+  const existing = body.skipDuplicates ? await prisma.customer.findMany({ where: { tenantId: tid(req) }, select: { name: true, email: true, phone: true, mobile: true, gstin: true } }) : [];
+  const emails = new Set(existing.map((c) => c.email?.toLowerCase()).filter(Boolean));
+  const gstins = new Set(existing.map((c) => c.gstin?.toUpperCase()).filter(Boolean));
+  const phones = new Set(existing.flatMap((c) => [phoneKey(c.phone), phoneKey(c.mobile)]).filter(Boolean));
+  // Customers without email, GSTIN or phone can only be matched by name.
+  const nameKey = (name: string) => name.toLowerCase().replace(/\s+/g, ' ').trim();
+  const bareNames = new Set(existing.filter((c) => !c.email && !c.gstin && !phoneKey(c.phone) && !phoneKey(c.mobile)).map((c) => nameKey(c.name)));
+
+  let created = 0;
+  const skipped: { row: number; reason: string }[] = [];
+  for (const [i, r] of rows.entries()) {
+    const row = i + 2; // header is row 1
+    const company = pick(r, ...COMPANY);
+    const typeRaw = normKey(pick(r, 'customertype', 'type') ?? '');
+    const gstTreatment = gstTreatmentOf(pick(r, 'gsttreatment', 'gstregistrationtype', 'registrationtype', 'taxtreatment'));
+    const paymentTerms = paymentTermsOf(pick(r, 'paymentterms', 'terms', 'creditterms'));
+    if (gstTreatment === 'INVALID') { skipped.push({ row, reason: `Unknown GST treatment "${pick(r, 'gsttreatment', 'gstregistrationtype', 'registrationtype', 'taxtreatment')}"` }); continue; }
+    if (paymentTerms === 'INVALID') { skipped.push({ row, reason: `Unknown payment terms "${pick(r, 'paymentterms', 'terms', 'creditterms')}"` }); continue; }
+    const stateName = pick(r, 'state', 'billingstate', 'province');
+    // The state code decides CGST+SGST vs IGST: take it from the column, else from the state name (GSTIN wins later).
+    const stateCodeRaw = pick(r, 'statecode', 'gststatecode', 'placeofsupply') ?? (stateName ? stateCodeFromName(stateName) : undefined);
+    const statusRaw = (pick(r, 'status') ?? '').toUpperCase();
+    const parsed = customerSchema.safeParse({
+      name: pick(r, ...NAME) ?? company,
+      company,
+      customerType: typeRaw.startsWith('ind') ? 'INDIVIDUAL' : typeRaw.startsWith('bus') || typeRaw.startsWith('com') ? 'BUSINESS' : undefined,
+      email: pick(r, 'email', 'emailaddress', 'emailid')?.toLowerCase(),
+      phone: pick(r, 'phone', 'phonenumber', 'workphone', 'contactnumber', 'telephone'),
+      mobile: pick(r, 'mobile', 'mobilenumber', 'mobilephone', 'whatsapp'),
+      website: pick(r, 'website', 'web', 'url'),
+      currency: pick(r, 'currency', 'currencycode')?.toUpperCase(),
+      gstTreatment,
+      gstin: pick(r, 'gstin', 'gstnumber', 'gstno', 'gst', 'gstinuin')?.replace(/\s/g, '').toUpperCase(),
+      pan: pick(r, 'pan', 'pannumber', 'panno')?.replace(/\s/g, '').toUpperCase(),
+      paymentTerms,
+      billingAttention: pick(r, 'attention', 'billingattention'),
+      billingAddress: pick(r, 'billingaddress', 'address', 'street', 'addressline', 'billingstreet'),
+      city: pick(r, 'city', 'billingcity', 'town'),
+      state: stateName,
+      stateCode: stateCodeRaw && /^\d{1,2}$/.test(stateCodeRaw) ? stateCodeRaw.padStart(2, '0') : stateCodeRaw,
+      postalCode: pick(r, 'postalcode', 'pincode', 'pin', 'zip', 'zipcode', 'billingzip', 'billingcode'),
+      country: pick(r, 'country', 'billingcountry'),
+      status: ['ACTIVE', 'INACTIVE', 'PROSPECT'].includes(statusRaw) ? statusRaw : undefined,
+      notes: pick(r, 'notes', 'note', 'remarks', 'comments'),
+    });
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      skipped.push({ row, reason: issue ? `${issue.path.join('.') || 'Row'}: ${issue.message}` : 'Invalid row' });
+      continue;
+    }
+    let d: typeof parsed.data;
+    try {
+      // Same GST rules as adding a customer by hand: state and PAN come from the GSTIN.
+      d = normalizeGst({ ...parsed.data, gstin: parsed.data.gstin ?? (parsed.data.gstTreatment ? null : undefined) });
+    } catch (e) {
+      skipped.push({ row, reason: (e as Error).message });
+      continue;
+    }
+    const pk = phoneKey(d.phone) ?? phoneKey(d.mobile);
+    if (body.skipDuplicates) {
+      if (d.email && emails.has(d.email)) { skipped.push({ row, reason: `Duplicate email ${d.email}` }); continue; }
+      if (d.gstin && gstins.has(d.gstin)) { skipped.push({ row, reason: `Duplicate GSTIN ${d.gstin}` }); continue; }
+      if (pk && phones.has(pk)) { skipped.push({ row, reason: `Duplicate phone ${d.phone ?? d.mobile}` }); continue; }
+      if (!d.email && !d.gstin && !pk && bareNames.has(nameKey(d.name))) { skipped.push({ row, reason: `Duplicate customer ${d.name} (no email, GSTIN or phone)` }); continue; }
+    }
+    if (room <= 0) { skipped.push({ row, reason: `Your plan allows ${tenant.plan?.maxCustomers} customers. Upgrade to add more.` }); continue; }
+    await prisma.$transaction(async (tx) => {
+      const code = await nextNumber(tx, tid(req), 'CUSTOMER');
+      await tx.customer.create({ data: { ...d, tenantId: tid(req), code, ownerId: req.user!.id } });
+    });
+    room--;
+    created++;
+    if (d.email) emails.add(d.email);
+    if (d.gstin) gstins.add(d.gstin);
+    if (pk) phones.add(pk);
+    if (!d.email && !d.gstin && !pk) bareNames.add(nameKey(d.name));
+  }
+  await audit(req, { action: 'customers.import', meta: { created, skipped: skipped.length } });
+  res.json({ created, skipped });
 });
 
 customersRouter.get('/customers/:id', requirePerm('customers.read'), async (req, res) => {

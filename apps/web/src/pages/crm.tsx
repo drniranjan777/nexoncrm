@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -9,10 +9,10 @@ import { useAction, useList, useMembers, memberName } from '@/lib/hooks';
 import type { Activity, Lead, ScoreDetails, Task } from '@/lib/types';
 import { cn, fmtDate, inr, inrCompact, titleCase, toDateInput } from '@/lib/utils';
 import {
-  Badge, Button, Card, CardHeader, ConfirmDialog, DescList, Dialog, EmptyState, ErrorState, Field, Input, LoadingBlock, PageHeader, Pagination,
+  Badge, Button, Card, CardHeader, Checkbox, ConfirmDialog, DescList, Dialog, EmptyState, ErrorState, Field, Input, LoadingBlock, PageHeader, Pagination,
   SearchInput, Select, StatusBadge, Table, TBody, TD, TH, THead, Toolbar, TR, Textarea, Switch,
 } from '@/components/ui';
-import { ActivityTimeline, AssigneeSelect, ExportButton, LogActivityDialog } from '@/components/shared';
+import { ActivityTimeline, AssigneeSelect, CsvImportDialog, ExportButton, LogActivityDialog } from '@/components/shared';
 
 export const STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'MEETING_SCHEDULED', 'PROPOSAL_SENT', 'NEGOTIATION', 'WON', 'LOST', 'ON_HOLD'];
 export const SERVICES = ['SEO and Digital Marketing', 'Website Design and Development', 'WordPress Development', 'Shopify Development', 'eCommerce', 'Mobile App Development', 'Custom Software', 'AI/ML', 'Website Maintenance', 'Other'];
@@ -79,33 +79,70 @@ function LeadFormDialog({ open, onOpenChange, lead, onSaved }: { open: boolean; 
   );
 }
 
-/** Reads a CSV as UTF-8, or as Windows-1252 (Excel's plain "CSV" on Windows) when it is not valid UTF-8. */
-async function readCsvFile(f: File) {
-  const bytes = await f.arrayBuffer();
-  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { return new TextDecoder('windows-1252').decode(bytes); }
+function ImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+  return (
+    <CsvImportDialog open={open} onOpenChange={onOpenChange} title="Import leads from CSV" endpoint="/leads/import" noun="lead" invalidate={[['/leads'], ['leads-pipeline']]}
+      help={<>
+        <p>Comma-, tab- or semicolon-separated, with a header row. Columns recognised: <code className="text-xs">name, company, email, phone, source, service, budget, value, notes</code>. Only <code className="text-xs">name</code> is required.</p>
+        <p>Values such as <code className="text-xs">₹ 1,30,000</code> are understood. Rows whose email or phone already exists (or repeats in the file) are skipped.</p>
+      </>}
+      template={{ filename: 'leads-template.csv', rows: [
+        ['name', 'company', 'email', 'phone', 'source', 'service', 'budget', 'value', 'notes'],
+        ['Asha Rao', 'Rao Textiles', 'asha@example.com', '9876543210', 'Google', 'Website Development', '50k-1 Lakh', '75000', 'Wants an e-commerce site'],
+      ] }} />
+  );
 }
 
-function ImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const [csv, setCsv] = useState('');
-  const [fileName, setFileName] = useState('');
-  const [result, setResult] = useState<{ created: number; skipped: { row: number; reason: string }[] } | null>(null);
-  const file = useRef<HTMLInputElement>(null);
-  const run = useAction(() => api.post<NonNullable<typeof result>>('/leads/import', { csv, skipDuplicates: true }), { invalidate: [['/leads']], onSuccess: (r) => { setResult(r); setCsv(''); toast.success(`${r.created} leads imported`); } });
+/** Largest page the leads API returns; offered as "All" in the rows-per-page menu. */
+const LEADS_ALL = 2000;
+
+type BulkResult = { matched: number; changed: number; skipped: { id: string; name: string; reason: string }[] };
+
+/** Actions for the selected leads: change stage, reassign, delete. `target` is either picked ids or the current filters. */
+function LeadBulkBar({ count, target, total, onDone, onClear }: {
+  count: number; target: { ids: string[] } | { filters: Record<string, string> }; total: number; onDone: () => void; onClear: () => void;
+}) {
+  const members = useMembers();
+  const [stage, setStage] = useState('');
+  const [lostOpen, setLostOpen] = useState(false);
+  const [lostReason, setLostReason] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const report = (r: BulkResult, verb: string) => {
+    const msg = `${r.changed} lead${r.changed === 1 ? '' : 's'} ${verb}`;
+    if (!r.skipped.length) toast.success(msg);
+    else {
+      const reasons = [...new Set(r.skipped.map((s) => s.reason))].slice(0, 2).join('; ');
+      toast.warning(`${msg}, ${r.skipped.length} skipped (${reasons})`);
+    }
+    onDone();
+  };
+  const run = useAction((body: object) => api.post<BulkResult>('/leads/bulk', { ...target, ...body }), { invalidate: [['/leads'], ['leads-pipeline']] });
+  const changeStage = (s: string, reason?: string) => run.mutate({ action: 'stage', stage: s, lostReason: reason }, { onSuccess: (r) => { report(r, `moved to ${titleCase(s)}`); setStage(''); setLostOpen(false); setLostReason(''); } });
+  const what = 'filters' in target ? `all ${total.toLocaleString('en-IN')} matching leads` : `${count} selected lead${count === 1 ? '' : 's'}`;
   return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) { setCsv(''); setFileName(''); setResult(null); } }} title="Import leads from CSV" size="lg"
-      footer={<><Button variant="secondary" onClick={() => onOpenChange(false)}>Close</Button><Button onClick={() => run.mutate()} loading={run.isPending} disabled={!csv}>Import</Button></>}>
-      <p className="mb-3 text-sm text-slate-600">Comma-, tab- or semicolon-separated, with a header row. Columns recognised: <code className="text-xs">name, company, email, phone, source, service, budget, value, notes</code>. Values such as <code className="text-xs">₹ 1,30,000</code> are understood. Rows whose email or phone already exists (or repeats in the file) are skipped.</p>
-      <input ref={file} type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" className="hidden"
-        onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) { setCsv(await readCsvFile(f)); setFileName(f.name); setResult(null); } }} />
-      <Button variant="secondary" onClick={() => file.current?.click()}><Upload /> Choose CSV file</Button>
-      {csv && <p className="mt-2 text-sm text-muted">{fileName}: {csv.split(/\r?\n/).filter((l) => l.trim()).length - 1} data rows loaded</p>}
-      {result && (
-        <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
-          <p className="font-medium">{result.created} created, {result.skipped.length} skipped</p>
-          {result.skipped.length > 0 && <ul className="mt-2 max-h-40 overflow-auto text-xs text-slate-600">{result.skipped.map((s, i) => <li key={i}>Row {s.row}: {s.reason}</li>)}</ul>}
-        </div>
-      )}
-    </Dialog>
+    <div className="flex flex-wrap items-center gap-2 border-b border-line bg-brand-50/60 px-4 py-2.5 text-sm">
+      <span className="font-medium text-ink">{'filters' in target ? `All ${total.toLocaleString('en-IN')} selected` : `${count} selected`}</span>
+      <span className="mx-1 h-5 w-px bg-line" />
+      <Select className="h-8 w-48" value={stage} disabled={run.isPending} aria-label="Change stage"
+        onChange={(e) => { const s = e.target.value; setStage(s); if (!s) return; if (s === 'LOST') setLostOpen(true); else changeStage(s); }}>
+        <option value="">Change stage…</option>
+        {STAGES.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}
+      </Select>
+      <Select className="h-8 w-48" value="" disabled={run.isPending} aria-label="Assign owner"
+        onChange={(e) => { const id = e.target.value; if (id) run.mutate({ action: 'assign', assignedToId: id }, { onSuccess: (r) => report(r, `assigned to ${members.data?.find((m) => m.id === id)?.name ?? 'the new owner'}`) }); }}>
+        <option value="">Assign to…</option>
+        {members.data?.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+      </Select>
+      <Button size="sm" variant="secondary" className="text-red-600" disabled={run.isPending} onClick={() => setDeleteOpen(true)}><Trash2 /> Delete</Button>
+      <Button size="sm" variant="ghost" onClick={onClear} className="ml-auto">Clear selection</Button>
+      <Dialog open={lostOpen} onOpenChange={(v) => { setLostOpen(v); if (!v) setStage(''); }} title={`Mark ${what} as lost`} size="sm"
+        footer={<><Button variant="secondary" onClick={() => { setLostOpen(false); setStage(''); }}>Cancel</Button><Button onClick={() => changeStage('LOST', lostReason.trim())} loading={run.isPending} disabled={lostReason.trim().length < 3}>Mark as lost</Button></>}>
+        <Field label="Reason" required hint="Saved on each lead and in its activity log"><Input value={lostReason} onChange={(e) => setLostReason(e.target.value)} placeholder="e.g. Budget too low" autoFocus /></Field>
+      </Dialog>
+      <ConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} danger confirmLabel="Delete" loading={run.isPending} title={`Delete ${what}?`}
+        description="Deleted leads and their activities cannot be recovered. Leads already converted to customers are kept."
+        onConfirm={() => run.mutate({ action: 'delete' }, { onSuccess: (r) => { setDeleteOpen(false); report(r, 'deleted'); } })} />
+    </div>
   );
 }
 
@@ -113,9 +150,21 @@ export function LeadsList() {
   const { can } = useAuth();
   const navigate = useNavigate();
   const members = useMembers();
-  const list = useList<Lead>('/leads', { stage: '', serviceInterest: '', assignedToId: '' }, { sort: 'score' });
+  const list = useList<Lead>('/leads', { stage: '', serviceInterest: '', assignedToId: '' }, { sort: 'score', storageKey: 'leads' });
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
+  // Selection: picked ids (kept across pages), or every lead matching the filters.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [allMatching, setAllMatching] = useState(false);
+  const clearSelection = () => { setSelected(new Set()); setAllMatching(false); };
+  useEffect(clearSelection, [JSON.stringify(list.params)]);
+  const canEdit = can('leads.update');
+  const pageIds = list.data?.items.map((l) => l.id) ?? [];
+  const pageAllSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const total = list.data?.total ?? 0;
+  const toggle = (id: string, on: boolean) => { setAllMatching(false); setSelected((s) => { const n = new Set(s); if (on) n.add(id); else n.delete(id); return n; }); };
+  const togglePage = (on: boolean) => { setAllMatching(false); setSelected((s) => { const n = new Set(s); for (const id of pageIds) { if (on) n.add(id); else n.delete(id); } return n; }); };
+  const filters = Object.fromEntries(Object.entries({ q: list.params.q ?? '', ...list.filters }).filter(([, v]) => v));
   return (
     <>
       <PageHeader title="Leads" description="Prospects in your sales pipeline, ranked by a transparent heuristic score."
@@ -135,8 +184,23 @@ export function LeadsList() {
           <EmptyState icon={<Target />} title="No leads found" description="Add leads manually or import a CSV." action={can('leads.update') && <Button onClick={() => setCreating(true)}><Plus /> New lead</Button>} />
         ) : (
           <>
+            {(selected.size > 0 || allMatching) && canEdit && (
+              <LeadBulkBar count={allMatching ? total : selected.size} total={total} target={allMatching ? { filters } : { ids: [...selected] }} onDone={clearSelection} onClear={clearSelection} />
+            )}
+            {canEdit && pageAllSelected && !allMatching && total > pageIds.length && (
+              <div className="border-b border-line bg-slate-50 px-4 py-2 text-center text-sm text-slate-600">
+                {selected.size === pageIds.length ? `All ${pageIds.length} leads on this page are selected.` : `${selected.size} leads selected.`}{' '}
+                <button className="font-medium text-brand-700 hover:underline" onClick={() => setAllMatching(true)}>Select all {total.toLocaleString('en-IN')} matching leads</button>
+              </div>
+            )}
+            {allMatching && (
+              <div className="border-b border-line bg-slate-50 px-4 py-2 text-center text-sm text-slate-600">
+                All {total.toLocaleString('en-IN')} leads matching the current filters are selected. <button className="font-medium text-brand-700 hover:underline" onClick={clearSelection}>Clear selection</button>
+              </div>
+            )}
             <Table>
               <THead><tr>
+                {canEdit && <TH className="w-10"><Checkbox checked={allMatching || pageAllSelected} onCheckedChange={togglePage} aria-label="Select all leads on this page" /></TH>}
                 <TH><button onClick={() => list.toggleSort('score')}>Score {list.sort.sort === 'score' && (list.sort.dir === 'desc' ? '↓' : '↑')}</button></TH>
                 <TH>Lead</TH><TH>Service</TH><TH>Stage</TH>
                 <TH className="text-right"><button onClick={() => list.toggleSort('estimatedValue')}>Value {list.sort.sort === 'estimatedValue' && (list.sort.dir === 'desc' ? '↓' : '↑')}</button></TH>
@@ -146,7 +210,8 @@ export function LeadsList() {
                 {list.data.items.map((l) => {
                   const overdue = l.nextFollowUpAt && new Date(l.nextFollowUpAt) < new Date() && !['WON', 'LOST'].includes(l.stage);
                   return (
-                    <TR key={l.id} onClick={() => navigate(`/leads/${l.id}`)}>
+                    <TR key={l.id} onClick={() => navigate(`/leads/${l.id}`)} className={cn((allMatching || selected.has(l.id)) && 'bg-brand-50/50')}>
+                      {canEdit && <TD onClick={(e) => e.stopPropagation()}><Checkbox checked={allMatching || selected.has(l.id)} onCheckedChange={(v) => toggle(l.id, v)} aria-label={`Select ${l.name}`} /></TD>}
                       <TD><ScorePill score={l.score} /></TD>
                       <TD><p className="font-medium">{l.name}</p><p className="text-xs text-muted">{l.company ?? l.email ?? '—'}</p></TD>
                       <TD className="text-slate-600">{l.serviceInterest ?? '—'}</TD>
@@ -159,7 +224,7 @@ export function LeadsList() {
                 })}
               </TBody>
             </Table>
-            <Pagination page={list.page} pages={list.data.pages} total={list.data.total} onPage={list.setPage} />
+            <Pagination page={list.page} pages={list.data.pages} total={list.data.total} onPage={list.setPage} pageSize={list.pageSize} onPageSize={list.setPageSize} allSize={LEADS_ALL} />
           </>
         )}
       </Card>

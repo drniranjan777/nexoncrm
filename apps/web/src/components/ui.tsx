@@ -100,9 +100,9 @@ export function Switch({ checked, onCheckedChange, id, disabled }: { checked: bo
   );
 }
 
-export function Checkbox({ checked, onCheckedChange, id }: { checked: boolean; onCheckedChange: (v: boolean) => void; id?: string }) {
+export function Checkbox({ checked, onCheckedChange, id, 'aria-label': ariaLabel }: { checked: boolean; onCheckedChange: (v: boolean) => void; id?: string; 'aria-label'?: string }) {
   return (
-    <CheckboxPrimitive.Root id={id} checked={checked} onCheckedChange={(v) => onCheckedChange(v === true)}
+    <CheckboxPrimitive.Root id={id} aria-label={ariaLabel} checked={checked} onCheckedChange={(v) => onCheckedChange(v === true)}
       className="flex size-4 shrink-0 items-center justify-center rounded border border-slate-300 bg-white data-[state=checked]:border-brand-700 data-[state=checked]:bg-brand-700">
       <CheckboxPrimitive.Indicator><Check className="size-3 text-white" strokeWidth={3} /></CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
@@ -253,11 +253,25 @@ export const TBody = (p: HTMLAttributes<HTMLTableSectionElement>) => <tbody clas
 export const TR = ({ className, ...p }: HTMLAttributes<HTMLTableRowElement>) => <tr className={cn('transition-colors hover:bg-slate-50/70', p.onClick && 'cursor-pointer', className)} {...p} />;
 export const TD = ({ className, ...p }: HTMLAttributes<HTMLTableCellElement> & { colSpan?: number }) => <td className={cn('px-4 py-3 align-middle', className)} {...p} />;
 
-export function Pagination({ page, pages, total, onPage }: { page: number; pages: number; total: number; onPage: (p: number) => void }) {
+/** Page navigation; with `onPageSize`, also a rows-per-page menu (the largest size is shown as "All"). */
+export function Pagination({ page, pages, total, onPage, pageSize, onPageSize, sizes = [25, 50, 100], allSize }: {
+  page: number; pages: number; total: number; onPage: (p: number) => void;
+  pageSize?: number; onPageSize?: (n: number) => void; sizes?: number[]; allSize?: number;
+}) {
   if (total === 0) return null;
   return (
-    <div className="flex items-center justify-between border-t border-line px-4 py-3 text-[13px] text-muted">
-      <span>{total.toLocaleString('en-IN')} result{total === 1 ? '' : 's'}</span>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-[13px] text-muted">
+      <div className="flex items-center gap-3">
+        <span>{total.toLocaleString('en-IN')} result{total === 1 ? '' : 's'}</span>
+        {onPageSize && pageSize && (
+          <label className="flex items-center gap-2">Rows per page
+            <select className="h-8 rounded-md border border-line bg-white px-2 text-[13px] text-ink" value={pageSize} onChange={(e) => onPageSize(Number(e.target.value))} aria-label="Rows per page">
+              {sizes.map((s) => <option key={s} value={s}>{s}</option>)}
+              {allSize && <option value={allSize}>All</option>}
+            </select>
+          </label>
+        )}
+      </div>
       <div className="flex items-center gap-2">
         <span>Page {page} of {pages}</span>
         <Button variant="secondary" size="icon" className="size-8" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Previous page"><ChevronLeft /></Button>
