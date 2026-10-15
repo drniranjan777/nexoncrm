@@ -11,7 +11,7 @@ import { DEFAULT_PREFIXES, type SequenceType } from '../lib/numbering.js';
 import { GSTIN_REGEX, GST_RATES } from '../lib/gst.js';
 import { tenantSettings } from '../lib/tenants.js';
 import { enqueueEmail } from '../lib/queue.js';
-import { mailConfigured } from '../lib/mail.js';
+import { mailConfigured, resolveSmtp } from '../lib/mail.js';
 import { assertTenantRefs } from '../lib/tenantRefs.js';
 import { can, requirePerm, requireStaff, tid } from '../middleware/tenant.js';
 import { parse } from '../middleware/validate.js';
@@ -188,13 +188,14 @@ settingsRouter.post('/invitations', requirePerm('users.manage'), async (req, res
   const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tid(req) }, select: { name: true } });
   const link = `${config.appUrl}/accept-invite?token=${token}`;
   await enqueueEmail({
+    tenantId: tid(req),
     to: body.email,
     subject: `You're invited to ${tenant.name}`,
     text: `${req.user!.name} invited you to join ${tenant.name} as ${role.name}.\n\nAccept the invitation (valid for 7 days):\n${link}`,
   });
   await audit(req, { action: 'users.invite', entityType: 'invitation', entityId: inv.id, meta: { email: body.email, role: role.key } });
   // The link is returned so admins can share it directly when email is not configured.
-  res.status(201).json({ id: inv.id, email: inv.email, expiresAt: inv.expiresAt, inviteLink: mailConfigured() ? undefined : link });
+  res.status(201).json({ id: inv.id, email: inv.email, expiresAt: inv.expiresAt, inviteLink: (await mailConfigured(tid(req))) ? undefined : link });
 });
 
 settingsRouter.delete('/invitations/:id', requirePerm('users.manage'), async (req, res) => {
@@ -308,9 +309,11 @@ settingsRouter.post('/settings/subscription/request-change', requirePerm('subscr
 
 // ── Integrations (status only; secrets live in server environment variables) ──
 
-settingsRouter.get('/settings/integrations', requirePerm('settings.manage'), (_req, res) => {
+settingsRouter.get('/settings/integrations', requirePerm('settings.manage'), async (req, res) => {
+  const smtp = await resolveSmtp(tid(req));
+  const via = { tenant: 'your own mail server', platform: 'the platform mail server', environment: 'the server mail settings' };
   res.json([
-    { key: 'email', name: 'Email (SMTP)', connected: mailConfigured(), detail: mailConfigured() ? 'Outgoing email is enabled' : 'Not configured: emails are logged on the server only' },
+    { key: 'email', name: 'Email (SMTP)', connected: !!smtp, detail: smtp ? `Outgoing email is sent through ${via[smtp.source]} (${smtp.host})` : 'Not configured: emails are logged on the server only. Set up your mail server under Settings → Email.' },
     { key: 'storage', name: 'File storage', connected: true, detail: config.storage.driver === 's3' ? 'S3-compatible private bucket' : 'Local private disk storage' },
     { key: 'ai', name: 'AI provider', connected: config.ai.provider === 'anthropic' && !!config.ai.anthropicKey, detail: config.ai.provider === 'anthropic' && config.ai.anthropicKey ? `Claude (${config.ai.anthropicModel})` : 'Heuristic mode: templates and rule-based scoring, no external AI calls' },
     { key: 'jobs', name: 'Background jobs', connected: !!config.redisUrl, detail: config.redisUrl ? 'Redis + BullMQ' : 'In-process scheduler' },

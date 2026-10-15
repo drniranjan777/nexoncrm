@@ -7,7 +7,7 @@ import { runMaintenance } from '../jobs/maintenance.js';
 // BullMQ when REDIS_URL is configured; otherwise jobs run in-process so local dev and tests need no Redis.
 
 /** `logId` links the job to an EmailLog row whose status follows the send result. */
-type EmailJob = MailMessage & { tenantId?: string; logId?: string };
+type EmailJob = MailMessage & { logId?: string };
 const EMAIL_ATTEMPTS = 5;
 
 /** Records what the mail server reported. Never throws: logging must not affect sending. */

@@ -138,7 +138,7 @@ export function EmailComposePage() {
       {!d.smtpConfigured && (
         <div className="mb-4 flex gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          <span>Outgoing email (SMTP) is not configured on the server, so this email will be logged rather than delivered. Ask your administrator to set SMTP in the server environment.</span>
+          <span>No mail server is set up, so this email will be recorded but not sent. An administrator can add one under <a href="/settings/email" className="font-medium underline">Settings → Email (SMTP)</a>.</span>
         </div>
       )}
       <Card className="overflow-hidden">

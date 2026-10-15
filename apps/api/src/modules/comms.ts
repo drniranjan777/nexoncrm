@@ -125,7 +125,7 @@ async function draftFor(req: Request, kind: Kind, id: string) {
       to, cc: [self.email], bcc: [] as string[], subject, html, attachmentName,
       contacts: ctx.contacts.filter((c) => c.email).map((c) => ({ name: c.name, email: c.email! })),
       customerId: ctx.customer?.id ?? null,
-      smtpConfigured: mailConfigured(),
+      smtpConfigured: await mailConfigured(tid(req)),
     },
   };
 }
@@ -211,7 +211,8 @@ commsRouter.post('/email/:kind/:id/send', async (req, res) => {
   }
   await audit(req, { action: `${kind}.emailed`, entityType: kind, entityId: String(req.params.id), meta: { to: body.to, cc: body.cc, attachments: files, emailLogId: log.id } });
   // Queued, not delivered: the status on the email log changes once the mail server responds.
-  res.json({ ok: true, delivered: mailConfigured(), status: 'QUEUED', emailLogId: log.id, smtpConfigured: mailConfigured(), attachments: files });
+  const configured = await mailConfigured(t);
+  res.json({ ok: true, delivered: configured, status: 'QUEUED', emailLogId: log.id, smtpConfigured: configured, attachments: files });
 });
 
 /** Emails a statement of accounts for a period. */
@@ -224,7 +225,7 @@ commsRouter.post('/email/statement/:customerId', async (req, res) => {
   const st = await buildStatement(tid(req), customer.id, body.from, body.toDate, body.currency);
   const pdf = await renderStatementPdf({ seller: await sellerOf(tenant), customer: buyerOf(customer), from: body.from, to: body.toDate, ...st });
   const text = body.message ?? `Dear ${customer.name},\n\nPlease find attached your statement of accounts from ${fmt(body.from)} to ${fmt(body.toDate)}. Balance due: ${formatMoney(st.closing, st.currency)}.\n\nRegards,\n${req.user!.name}\n${tenant.name}`;
-  await enqueueEmail({ to: body.to, cc: body.cc, subject: body.subject ?? `Statement of accounts from ${tenant.name}`, text, attachments: [{ filename: `statement-${customer.code}.pdf`, contentBase64: pdf.toString('base64'), contentType: 'application/pdf' }], fromName: `${req.user!.name} (${tenant.name})`, replyTo: req.user!.email });
+  await enqueueEmail({ tenantId: tid(req), to: body.to, cc: body.cc, subject: body.subject ?? `Statement of accounts from ${tenant.name}`, text, attachments: [{ filename: `statement-${customer.code}.pdf`, contentBase64: pdf.toString('base64'), contentType: 'application/pdf' }], fromName: `${req.user!.name} (${tenant.name})`, replyTo: req.user!.email });
   await audit(req, { action: 'customers.statement_emailed', entityType: 'customer', entityId: customer.id, meta: { to: body.to } });
-  res.json({ ok: true, delivered: mailConfigured() });
+  res.json({ ok: true, delivered: await mailConfigured(tid(req)) });
 });

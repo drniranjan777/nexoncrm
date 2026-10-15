@@ -106,6 +106,7 @@ model Tenant {
   proformaInvoices   ProformaInvoice[]
   taxRates           TaxRate[]
   emailLogs          EmailLog[]
+  mailServer         TenantMailServer?
   invoices           Invoice[]
   payments           Payment[]
   creditNotes        CreditNote[]
@@ -1431,4 +1432,27 @@ model EmailLog {
   updatedAt         DateTime  @updatedAt
 
   @@index([tenantId, entityType, entityId])
+}
+
+/// An organization's own outgoing mail server. Without one, the platform default (or the server environment) is used.
+/// The password is encrypted at rest (AES-256-GCM) and never returned by the API.
+model TenantMailServer {
+  tenantId      String    @id
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  enabled       Boolean   @default(true)
+  host          String
+  port          Int       @default(587)
+  /// TLS (implicit, usually 465) | STARTTLS (usually 587) | NONE
+  security      String    @default("STARTTLS")
+  username      String?
+  passwordEnc   String?
+  fromEmail     String
+  fromName      String?
+  replyTo       String?
+  lastTestAt    DateTime?
+  lastTestOk    Boolean?
+  lastTestError String?
+  updatedById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

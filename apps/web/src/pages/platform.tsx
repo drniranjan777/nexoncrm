@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { PlatformEmailSettings } from './mailSettings';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -214,6 +215,7 @@ export function PlatformSettings() {
         <CardHeader title="Integrations" description="Configured through server environment variables." />
         <div className="p-5">{integrations.data && <DescList items={Object.entries(integrations.data).map(([k, v]) => [k, <code className="text-xs">{v}</code>])} />}</div>
       </Card>
+      <PlatformEmailSettings />
     </div>
   );
 }

@@ -30,5 +30,9 @@ export const config = {
     anthropicKey: env.ANTHROPIC_API_KEY || undefined,
     anthropicModel: env.ANTHROPIC_MODEL ?? 'claude-opus-5-5',
   },
+  /** Key material for secrets stored in the database (SMTP passwords). The placeholder value does not count. */
+  encryptionSecret: [env.SETTINGS_ENCRYPTION_KEY, env.SESSION_SECRET].find((v) => v && v !== 'change-me') ?? (env.NODE_ENV === 'test' || env.VITEST === 'true' ? 'test-only-key' : undefined),
+  /** Allow organizations to point SMTP at private or local addresses (off by default: prevents probing internal hosts). */
+  allowPrivateSmtpHosts: env.ALLOW_PRIVATE_SMTP_HOSTS === 'true',
   isTest: env.NODE_ENV === 'test' || env.VITEST === 'true',
 };

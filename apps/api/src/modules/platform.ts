@@ -11,12 +11,14 @@ import { provisionTenant } from '../lib/tenants.js';
 import { enqueueEmail } from '../lib/queue.js';
 import { mailConfigured } from '../lib/mail.js';
 import { requireSuperAdmin } from '../middleware/auth.js';
+import { platformMailRouter } from './mailSettings.js';
 import { parse } from '../middleware/validate.js';
 
 // Platform administration. Super admins manage tenants and plans here; they do NOT receive tenant
 // memberships, so they cannot browse tenant business data through the tenant APIs. Every action is audited.
 export const platformRouter = Router();
 platformRouter.use(requireSuperAdmin);
+platformRouter.use(platformMailRouter);
 
 export const MODULES = ['crm', 'feedback', 'projects', 'support', 'finance', 'reports', 'ai'] as const;
 
@@ -79,7 +81,7 @@ platformRouter.post('/tenants', async (req, res) => {
   const link = `${config.appUrl}/accept-invite?token=${token}`;
   await enqueueEmail({ to: body.ownerEmail, subject: `Your ${tenant.name} workspace is ready`, text: `A workspace has been created for ${tenant.name}.\n\nAccept your owner invitation (valid 14 days):\n${link}` });
   await audit(req, { action: 'platform.tenant_create', entityType: 'tenant', entityId: tenant.id, tenantId: tenant.id, meta: { ownerEmail: body.ownerEmail } });
-  res.status(201).json({ tenant, inviteLink: mailConfigured() ? undefined : link });
+  res.status(201).json({ tenant, inviteLink: (await mailConfigured()) ? undefined : link });
 });
 
 platformRouter.get('/tenants/:id', async (req, res) => {
@@ -144,9 +146,9 @@ platformRouter.post('/tenants/:id/admins', async (req, res) => {
   await prisma.invitation.deleteMany({ where: { tenantId: tenant.id, email: body.email, acceptedAt: null } });
   await prisma.invitation.create({ data: { tenantId: tenant.id, email: body.email, roleId: role.id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + 7 * 86_400_000), invitedById: req.user!.id } });
   const link = `${config.appUrl}/accept-invite?token=${token}`;
-  await enqueueEmail({ to: body.email, subject: `Administrator access to ${tenant.name}`, text: `You have been invited as ${role.name} of ${tenant.name}.\n\n${link}` });
+  await enqueueEmail({ tenantId: tenant.id, to: body.email, subject: `Administrator access to ${tenant.name}`, text: `You have been invited as ${role.name} of ${tenant.name}.\n\n${link}` });
   await audit(req, { action: 'platform.tenant_admin_invite', entityType: 'tenant', entityId: tenant.id, tenantId: tenant.id, meta: body });
-  res.status(201).json({ ok: true, inviteLink: mailConfigured() ? undefined : link });
+  res.status(201).json({ ok: true, inviteLink: (await mailConfigured(tenant.id)) ? undefined : link });
 });
 
 platformRouter.patch('/tenants/:id/admins/:membershipId', async (req, res) => {
@@ -249,9 +251,9 @@ platformRouter.patch('/settings', async (req, res) => {
   res.json({ ok: true });
 });
 
-platformRouter.get('/integrations', (_req, res) => {
+platformRouter.get('/integrations', async (_req, res) => {
   res.json({
-    email: mailConfigured() ? 'smtp' : 'console', storage: config.storage.driver, jobs: config.redisUrl ? 'bullmq' : 'in-process',
+    email: (await mailConfigured()) ? 'smtp' : 'console', storage: config.storage.driver, jobs: config.redisUrl ? 'bullmq' : 'in-process',
     ai: config.ai.provider === 'anthropic' && config.ai.anthropicKey ? `anthropic:${config.ai.anthropicModel}` : 'heuristic',
   });
 });

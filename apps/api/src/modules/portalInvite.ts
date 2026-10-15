@@ -26,10 +26,11 @@ export async function invitePortalUser(req: Request, customer: Customer) {
   const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { name: true } });
   const link = `${config.appUrl}/accept-invite?token=${token}`;
   await enqueueEmail({
+    tenantId,
     to: customer.email,
     subject: `Your customer portal at ${tenant.name}`,
     text: `Hi ${customer.name},\n\n${tenant.name} has given you access to its customer portal, where you can view quotes and invoices, download PDFs, raise support requests and share feedback.\n\nSet up your access (link valid 14 days):\n${link}`,
   });
   await audit(req, { action: 'customers.portal_invite', entityType: 'customer', entityId: customer.id });
-  return { status: 'invited' as const, inviteLink: mailConfigured() ? undefined : link };
+  return { status: 'invited' as const, inviteLink: (await mailConfigured(tenantId)) ? undefined : link };
 }

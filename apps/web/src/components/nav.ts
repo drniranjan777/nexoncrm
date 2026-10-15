@@ -3,7 +3,7 @@ import {
   Activity, BarChart3, BookOpen, Briefcase, Building2, CalendarClock, CheckSquare, ClipboardCheck, CreditCard, FileMinus, FileText,
   FolderKanban, FolderOpen, Gauge, Headphones, Inbox, KanbanSquare, LayoutDashboard, LifeBuoy, ListChecks, MessageSquareHeart,
   Milestone, Package, PieChart, Plug, Receipt, ScrollText, Settings2, Shield, Tags, Target, TrendingUp, UserCog, Users, UsersRound, Wallet, Bell,
-  Repeat, ReceiptIndianRupee, Landmark, Timer, LibraryBig, Building, Coins, FileCheck2, Percent,
+  Repeat, ReceiptIndianRupee, Landmark, Timer, LibraryBig, Building, Coins, FileCheck2, Percent, Mail,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -99,6 +99,7 @@ export const NAV: NavGroup[] = [
       { label: 'Document Settings', to: '/settings/documents', icon: FileText, perms: ['settings.manage'] },
       { label: 'Subscription', to: '/settings/subscription', icon: CreditCard, perms: ['subscription.manage', 'settings.manage'] },
       { label: 'Notifications', to: '/settings/notifications', icon: Bell, perms: ['settings.manage'] },
+      { label: 'Email (SMTP)', to: '/settings/email', icon: Mail, perms: ['settings.manage'] },
       { label: 'Integrations', to: '/settings/integrations', icon: Plug, perms: ['settings.manage'] },
       { label: 'Audit Logs', to: '/settings/audit', icon: Shield, perms: ['audit.read'] },
     ],

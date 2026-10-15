@@ -141,7 +141,7 @@ supportRouter.post('/tickets/:id/comments', requirePerm('tickets.update'), async
     if (t.customerId) {
       const customer = await prisma.customer.findUnique({ where: { id: t.customerId }, select: { email: true, name: true } });
       if (customer?.email) {
-        await enqueueEmail({ to: customer.email, subject: `[${t.number}] ${t.subject}`, text: `Hi ${customer.name},\n\n${body.body}\n\n${req.user!.name}` });
+        await enqueueEmail({ tenantId: t.tenantId, to: customer.email, subject: `[${t.number}] ${t.subject}`, text: `Hi ${customer.name},\n\n${body.body}\n\n${req.user!.name}` });
       }
     }
     const portalUsers = await prisma.membership.findMany({ where: { tenantId: tid(req), customerId: t.customerId ?? '__none__', status: 'ACTIVE' }, select: { userId: true } });

@@ -171,6 +171,7 @@ publicRouter.post('/feedback', submitLimiter, upload.array('attachments', 5), as
   const trackUrl = `${config.feedbackPublicUrl}/track?ref=${encodeURIComponent(feedback.referenceNo)}&t=${trackingToken}&tenant=${tenant.slug}`;
   if (settings.notifications.emailCustomerOnFeedback) {
     await enqueueEmail({
+      tenantId: tenant.id,
       to: feedback.email,
       subject: `We received your feedback (${feedback.referenceNo})`,
       text: `Hi ${feedback.name},\n\nThank you for your feedback to ${tenant.name}. Your reference number is ${feedback.referenceNo}.\n\nYou can track its status here:\n${trackUrl}\n\nRegards,\n${tenant.name}`,

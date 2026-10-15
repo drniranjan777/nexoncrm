@@ -18,6 +18,7 @@ import { insightsRouter } from './insights.js';
 import { companyFinanceRouter } from './companyFinance.js';
 import { proformaRouter } from './proforma.js';
 import { taxesRouter } from './taxes.js';
+import { tenantMailRouter } from './mailSettings.js';
 
 // Every router mounted here runs after requireTenant, so req.ctx is always set.
 export const tenantRouter = Router();
@@ -40,6 +41,7 @@ tenantRouter.use(filesRouter);
 tenantRouter.use(financeRouter);
 tenantRouter.use(proformaRouter);
 tenantRouter.use(taxesRouter);
+tenantRouter.use(tenantMailRouter);
 tenantRouter.use(reportsRouter);
 tenantRouter.use(settingsRouter);
 tenantRouter.use(companyFinanceRouter);

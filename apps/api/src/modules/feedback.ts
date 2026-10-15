@@ -140,6 +140,7 @@ feedbackRouter.post('/feedback/:id/events', requirePerm('feedback.resolve'), asy
   }
   if (body.kind === 'REPLY') {
     await enqueueEmail({
+      tenantId: fb.tenantId,
       to: fb.email,
       subject: `Update on your feedback ${fb.referenceNo}`,
       text: `Hi ${fb.name},\n\n${body.body}\n\nRegards,\n${req.user!.name}\n${fb.tenant.name}\n\n(Reply via your tracking link to respond.)`,

@@ -58,7 +58,11 @@ defined in `apps/api/prisma/seed.ts` (override with `SEED_PASSWORD`). For local 
 
 See `apps/api/.env.example`. Notable switches:
 
-- `SMTP_*`: without SMTP, emails are printed to the API console and invite links are shown in the UI.
+- Email: each organization can set its own SMTP server under **Settings → Email (SMTP)**; the platform admin sets the
+  default under **Platform → Settings**. Otherwise `SMTP_*` from the environment is used. With none of these, emails
+  are printed to the API console and invite links are shown in the UI. SMTP passwords are stored encrypted with
+  `SETTINGS_ENCRYPTION_KEY` (or `SESSION_SECRET`); organization servers must resolve to public addresses unless
+  `ALLOW_PRIVATE_SMTP_HOSTS=true`.
 - `STORAGE_DRIVER=s3` + `S3_*`: private S3-compatible storage; default is `./storage` on disk.
 - `AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`: AI drafts and summaries via Claude. The default
   `heuristic` mode makes no external calls and uses templates. Lead scoring and feedback sentiment are

@@ -96,6 +96,8 @@ const DocumentSettings = L(set, 'DocumentSettings');
 const SubscriptionSettings = L(set, 'SubscriptionSettings');
 const NotificationSettings = L(set, 'NotificationSettings');
 const IntegrationsSettings = L(set, 'IntegrationsSettings');
+const mail = () => import('./pages/mailSettings');
+const EmailSettings = L(mail, 'EmailSettings');
 const AuditLogsPage = L(set, 'AuditLogsPage');
 
 const por = () => import('./pages/portal');
@@ -273,6 +275,7 @@ export default function App() {
           <Route path="/settings/subscription" element={<StaffOnly><SubscriptionSettings /></StaffOnly>} />
           <Route path="/settings/notifications" element={<StaffOnly><NotificationSettings /></StaffOnly>} />
           <Route path="/settings/integrations" element={<StaffOnly><IntegrationsSettings /></StaffOnly>} />
+          <Route path="/settings/email" element={<StaffOnly><EmailSettings /></StaffOnly>} />
           <Route path="/settings/audit" element={<StaffOnly><AuditLogsPage /></StaffOnly>} />
           <Route path="*" element={<NotFound />} />
         </Route>
