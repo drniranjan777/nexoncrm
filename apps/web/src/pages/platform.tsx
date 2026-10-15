@@ -3,7 +3,8 @@ import { PlatformEmailSettings } from './mailSettings';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Building2, Copy, Plus } from 'lucide-react';
+import { Building2, Copy, Pencil, Plus, Power, PowerOff, Trash2 } from 'lucide-react';
+import { MoreMenu } from './finance';
 import { api } from '@/lib/api';
 import { useAction, useList } from '@/lib/hooks';
 import type { AuditLog } from '@/lib/types';
@@ -15,7 +16,7 @@ import {
 import { AuditTable } from './settings';
 
 interface Plan { id: string; code: string; name: string; priceMonthly: string; maxUsers: number; maxCustomers: number; storageMb: number; aiRequests: number; modules: string[]; active: boolean; _count?: { tenants: number } }
-interface TenantRow { id: string; name: string; slug: string; status: string; trialEndsAt: string | null; currentPeriodEnd: string | null; createdAt: string; storageUsedBytes: number; plan: { id: string; name: string; code: string } | null; _count: { memberships: number; customers: number; invoices: number } }
+interface TenantRow { id: string; name: string; slug: string; legalName?: string | null; email?: string | null; phone?: string | null; status: string; trialEndsAt: string | null; currentPeriodEnd: string | null; createdAt: string; storageUsedBytes: number; plan: { id: string; name: string; code: string } | null; _count: { memberships: number; customers: number; invoices: number } }
 
 export function PlatformOverview() {
   const q = useQuery({ queryKey: ['platform-overview'], queryFn: () => api.get<{ tenantsByStatus: { status: string; count: number }[]; tenantsByPlan: { plan: string; count: number }[]; activeUsers: number; newTenantsThisMonth: number; storageUsedMb: number; aiRequestsThisMonth: number; feedbackThisMonth: number; invoicesIssuedThisMonth: number; estimatedMrr: number }>('/platform/overview') });
@@ -43,9 +44,75 @@ export function PlatformOverview() {
   );
 }
 
+const isInactive = (status: string) => ['SUSPENDED', 'CANCELLED'].includes(status);
+
+/** Edit, activate/deactivate and delete a tenant. Renders its dialogs; `menu` gives the actions for a MoreMenu. */
+function useTenantActions(onDeleted?: () => void) {
+  const plans = useQuery({ queryKey: ['platform-plans'], queryFn: () => api.get<{ plans: Plan[] }>('/platform/plans') });
+  const [editing, setEditing] = useState<TenantRow | null>(null);
+  const [deactivating, setDeactivating] = useState<TenantRow | null>(null);
+  const [deleting, setDeleting] = useState<TenantRow | null>(null);
+  const [form, setForm] = useState({ name: '', slug: '', legalName: '', email: '', phone: '', planId: '', trialEndsAt: '' });
+  const [reason, setReason] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const invalidate = [['/platform/tenants'], ['platform-tenant'], ['platform-overview']];
+  const save = useAction(() => api.patch(`/platform/tenants/${editing!.id}`, { ...form, planId: form.planId || null, trialEndsAt: form.trialEndsAt || null }), { success: 'Tenant updated', invalidate, onSuccess: () => setEditing(null) });
+  const setStatus = useAction(({ t, status, why }: { t: TenantRow; status: string; why?: string }) => api.patch(`/platform/tenants/${t.id}`, { status, reason: why || undefined }), {
+    success: (_r) => 'Status updated', invalidate, onSuccess: () => { setDeactivating(null); setReason(''); },
+  });
+  const remove = useAction(() => api.delete(`/platform/tenants/${deleting!.id}`, { confirm }), { success: 'Workspace deleted', invalidate, onSuccess: () => { setDeleting(null); setConfirm(''); onDeleted?.(); } });
+  const openEdit = (t: TenantRow) => {
+    setForm({ name: t.name, slug: t.slug, legalName: t.legalName ?? '', email: t.email ?? '', phone: t.phone ?? '', planId: t.plan?.id ?? '', trialEndsAt: toDateInput(t.trialEndsAt) });
+    setEditing(t);
+  };
+  const menu = (t: TenantRow) => [
+    { label: 'Edit', icon: Pencil, onSelect: () => openEdit(t) },
+    { label: 'Activate', icon: Power, onSelect: () => setStatus.mutate({ t, status: 'ACTIVE' }), hidden: t.status === 'ACTIVE' },
+    { label: 'Deactivate', icon: PowerOff, onSelect: () => setDeactivating(t), hidden: isInactive(t.status) },
+    { label: 'Delete', icon: Trash2, onSelect: () => { setConfirm(''); setDeleting(t); }, danger: true },
+  ];
+  const dialogs = (
+    <>
+      <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)} title={`Edit ${editing?.name ?? ''}`}
+        footer={<><Button variant="secondary" onClick={() => setEditing(null)}>Cancel</Button><Button onClick={() => save.mutate()} loading={save.isPending} disabled={form.name.trim().length < 2 || !form.slug}>Save</Button></>}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Workspace name" required><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+          <Field label="Slug" required hint="Used in public feedback links. Changing it breaks old links."><Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase() })} /></Field>
+          <Field label="Legal name" className="sm:col-span-2"><Input value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} /></Field>
+          <Field label="Contact email"><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+          <Field label="Phone"><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
+          <Field label="Plan"><Select value={form.planId} onChange={(e) => setForm({ ...form, planId: e.target.value })}><option value="">No plan</option>{plans.data?.plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+          <Field label="Trial ends"><Input type="date" value={form.trialEndsAt} onChange={(e) => setForm({ ...form, trialEndsAt: e.target.value })} /></Field>
+        </div>
+      </Dialog>
+      <Dialog open={!!deactivating} onOpenChange={(v) => !v && setDeactivating(null)} title={`Deactivate ${deactivating?.name ?? ''}?`} size="sm"
+        description="Its users are blocked from the workspace straight away. Data is kept, and you can activate it again at any time."
+        footer={<><Button variant="secondary" onClick={() => setDeactivating(null)}>Cancel</Button><Button variant="danger" loading={setStatus.isPending} onClick={() => setStatus.mutate({ t: deactivating!, status: 'SUSPENDED', why: reason.trim() })}>Deactivate</Button></>}>
+        <Field label="Reason (shown to the workspace owners)"><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Subscription unpaid" /></Field>
+      </Dialog>
+      <Dialog open={!!deleting} onOpenChange={(v) => !v && setDeleting(null)} title={`Delete ${deleting?.name ?? ''} permanently?`} size="sm"
+        footer={<><Button variant="secondary" onClick={() => setDeleting(null)}>Cancel</Button>{deleting && isInactive(deleting.status) && <Button variant="danger" loading={remove.isPending} disabled={confirm !== deleting.slug} onClick={() => remove.mutate()}>Delete permanently</Button>}</>}>
+        {deleting && !isInactive(deleting.status) ? (
+          <div className="space-y-3 text-sm">
+            <p>This workspace is <strong>{deleting.status.toLowerCase()}</strong>. Deactivate it first, so its users are signed out of it before the data goes.</p>
+            <Button variant="secondary" onClick={() => { const t = deleting; setDeleting(null); setDeactivating(t); }}><PowerOff /> Deactivate now</Button>
+          </div>
+        ) : deleting && (
+          <div className="space-y-3 text-sm">
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-red-700">All of this workspace’s data is erased: customers, leads, quotes, invoices, payments, projects, tickets, feedback and files. <strong>This cannot be undone.</strong> User accounts are kept.</p>
+            <Field label={<>Type <code className="rounded bg-slate-100 px-1">{deleting.slug}</code> to confirm</>}><Input value={confirm} onChange={(e) => setConfirm(e.target.value.trim())} autoFocus /></Field>
+          </div>
+        )}
+      </Dialog>
+    </>
+  );
+  return { menu, dialogs, openEdit, setStatus, deactivate: setDeactivating, del: (t: TenantRow) => { setConfirm(''); setDeleting(t); } };
+}
+
 export function PlatformTenants() {
   const navigate = useNavigate();
   const list = useList<TenantRow>('/platform/tenants', { status: '' });
+  const actions = useTenantActions();
   const plans = useQuery({ queryKey: ['platform-plans'], queryFn: () => api.get<{ plans: Plan[]; modules: string[] }>('/platform/plans') });
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ name: '', slug: '', ownerEmail: '', planCode: 'starter', trialDays: '14', activate: false });
@@ -63,13 +130,14 @@ export function PlatformTenants() {
         </Toolbar>
         {list.isLoading ? <LoadingBlock /> : !list.data?.items.length ? <EmptyState icon={<Building2 />} title="No tenants" /> : (
           <>
-            <Table><THead><tr><TH>Tenant</TH><TH>Plan</TH><TH>Status</TH><TH className="text-right">Members</TH><TH className="text-right">Customers</TH><TH className="text-right">Storage</TH><TH>Created</TH></tr></THead><TBody>
+            <Table><THead><tr><TH>Tenant</TH><TH>Plan</TH><TH>Status</TH><TH className="text-right">Members</TH><TH className="text-right">Customers</TH><TH className="text-right">Storage</TH><TH>Created</TH><TH className="w-10" /></tr></THead><TBody>
               {list.data.items.map((t) => (
                 <TR key={t.id} onClick={() => navigate(`/platform/tenants/${t.id}`)}>
                   <TD><p className="font-medium">{t.name}</p><p className="text-xs text-muted">{t.slug}</p></TD><TD>{t.plan?.name ?? '—'}</TD>
                   <TD><StatusBadge status={t.status} />{t.status === 'TRIAL' && t.trialEndsAt && <span className="ml-2 text-xs text-muted">until {fmtDate(t.trialEndsAt)}</span>}</TD>
                   <TD className="text-right tabular-nums">{t._count.memberships}</TD><TD className="text-right tabular-nums">{t._count.customers}</TD>
                   <TD className="text-right tabular-nums">{(Number(t.storageUsedBytes) / 1048576).toFixed(1)} MB</TD><TD className="text-slate-600">{fmtDate(t.createdAt)}</TD>
+                  <TD className="py-1 text-right"><MoreMenu compact items={actions.menu(t)} /></TD>
                 </TR>
               ))}
             </TBody></Table>
@@ -77,6 +145,7 @@ export function PlatformTenants() {
           </>
         )}
       </Card>
+      {actions.dialogs}
       <Dialog open={open} onOpenChange={setOpen} title="Create tenant"
         footer={link ? <Button onClick={() => setOpen(false)}>Done</Button> : <><Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={() => create.mutate()} loading={create.isPending} disabled={!f.name || !f.ownerEmail}>Create</Button></>}>
         {link ? (
@@ -98,6 +167,8 @@ export function PlatformTenants() {
 
 export function PlatformTenantDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const actions = useTenantActions(() => navigate('/platform/tenants'));
   const q = useQuery({ queryKey: ['platform-tenant', id], queryFn: () => api.get<{ tenant: TenantRow & { plan: Plan | null }; admins: { id: string; status: string; role: { key: string; name: string }; user: { id: string; name: string; email: string; lastLoginAt: string | null } }[]; pendingInvites: { id: string; email: string; expiresAt: string; role: { name: string } }[]; usage: Record<string, number> }>(`/platform/tenants/${id}`) });
   const plans = useQuery({ queryKey: ['platform-plans'], queryFn: () => api.get<{ plans: Plan[] }>('/platform/plans') });
   const [f, setF] = useState({ status: '', planId: '', trialEndsAt: '', reason: '' });
@@ -111,7 +182,15 @@ export function PlatformTenantDetail() {
   const { tenant, admins, pendingInvites, usage } = q.data;
   return (
     <div className="space-y-6">
-      <PageHeader breadcrumb={<Link to="/platform/tenants" className="hover:underline">Tenants</Link>} title={<span className="flex items-center gap-3">{tenant.name}<StatusBadge status={tenant.status} /></span>} description={`${tenant.slug} · created ${fmtDate(tenant.createdAt)}`} />
+      <PageHeader breadcrumb={<Link to="/platform/tenants" className="hover:underline">Tenants</Link>} title={<span className="flex items-center gap-3">{tenant.name}<StatusBadge status={tenant.status} /></span>} description={`${tenant.slug} · created ${fmtDate(tenant.createdAt)}`}
+        actions={<>
+          <Button variant="secondary" onClick={() => actions.openEdit(tenant)}><Pencil /> Edit</Button>
+          {isInactive(tenant.status)
+            ? <Button variant="secondary" onClick={() => actions.setStatus.mutate({ t: tenant, status: 'ACTIVE' })} loading={actions.setStatus.isPending}><Power /> Activate</Button>
+            : <Button variant="secondary" onClick={() => actions.deactivate(tenant)}><PowerOff /> Deactivate</Button>}
+          <Button variant="danger" onClick={() => actions.del(tenant)}><Trash2 /> Delete</Button>
+        </>} />
+      {actions.dialogs}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {Object.entries(usage).map(([k, v]) => <Stat key={k} label={k.replace(/([A-Z])/g, ' $1').toLowerCase()} value={v} />)}
       </div>

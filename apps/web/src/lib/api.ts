@@ -76,7 +76,8 @@ export const api = {
     const res = await request<Response>('GET', path, undefined, { raw: true });
     return URL.createObjectURL(await res.blob());
   },
-  delete: <T>(path: string) => request<T>('DELETE', path),
+  /** An optional body is sent as JSON (e.g. a typed confirmation). */
+  delete: <T>(path: string, body?: unknown) => request<T>('DELETE', path, body),
   /** Downloads a file (PDF/CSV) from an authenticated endpoint. */
   async download(path: string, filename: string, query?: Query, inline = false) {
     const res = await request<Response>('GET', path, undefined, { query, raw: true });

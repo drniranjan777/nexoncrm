@@ -5,7 +5,8 @@ import { prisma } from '../lib/db.js';
 import { config } from '../lib/config.js';
 import { audit } from '../lib/audit.js';
 import { randomToken, sha256 } from '../lib/crypto.js';
-import { badRequest, notFound } from '../lib/errors.js';
+import { badRequest, conflict, notFound } from '../lib/errors.js';
+import { deleteObject } from '../lib/storage.js';
 import { listParams, paged, qstr, searchAny } from '../lib/list.js';
 import { provisionTenant } from '../lib/tenants.js';
 import { enqueueEmail } from '../lib/queue.js';
@@ -117,7 +118,11 @@ platformRouter.get('/tenants/:id', async (req, res) => {
 
 platformRouter.patch('/tenants/:id', async (req, res) => {
   const body = parse(z.object({
-    name: z.string().min(2).max(120).optional(),
+    name: z.string().trim().min(2).max(120).optional(),
+    slug: z.string().trim().toLowerCase().regex(/^[a-z0-9-]{2,48}$/, 'Use 2-48 lowercase letters, digits or hyphens').optional(),
+    legalName: z.string().trim().max(200).optional().nullable().transform((v) => v || null),
+    email: z.string().trim().toLowerCase().email().optional().nullable().or(z.literal('').transform(() => null)),
+    phone: z.string().trim().max(40).optional().nullable().transform((v) => v || null),
     status: z.enum(['TRIAL', 'ACTIVE', 'PAST_DUE', 'SUSPENDED', 'CANCELLED']).optional(),
     planId: z.string().nullable().optional(),
     trialEndsAt: z.coerce.date().nullable().optional(),
@@ -125,9 +130,16 @@ platformRouter.patch('/tenants/:id', async (req, res) => {
     reason: z.string().max(500).optional(),
   }), req.body);
   const { reason, ...data } = body;
+  const current = await prisma.tenant.findUnique({ where: { id: String(req.params.id) }, select: { id: true, slug: true, status: true } });
+  if (!current) throw notFound('Tenant');
   if (data.planId && !(await prisma.plan.findUnique({ where: { id: data.planId } }))) throw badRequest('Unknown plan');
-  const tenant = await prisma.tenant.update({ where: { id: String(req.params.id) }, data, omit: { settings: true } });
-  if (data.status === 'SUSPENDED' || data.status === 'CANCELLED') {
+  if (data.slug && data.slug !== current.slug) {
+    if (await prisma.tenant.findUnique({ where: { slug: data.slug }, select: { id: true } })) throw badRequest('This slug is already taken', { fieldErrors: { slug: ['Already taken'] } });
+    // Public feedback links use the slug; keep the default-tenant setting pointing at the same workspace.
+    await prisma.platformSetting.updateMany({ where: { key: 'defaultFeedbackTenant', value: { equals: current.slug } }, data: { value: data.slug } });
+  }
+  const tenant = await prisma.tenant.update({ where: { id: current.id }, data, omit: { settings: true } });
+  if ((data.status === 'SUSPENDED' || data.status === 'CANCELLED') && data.status !== current.status) {
     await prisma.notification.createMany({
       data: (await prisma.membership.findMany({ where: { tenantId: tenant.id, role: { key: 'owner' } }, select: { userId: true } }))
         .map((m) => ({ tenantId: tenant.id, userId: m.userId, title: `Workspace ${data.status!.toLowerCase()}`, body: reason })),
@@ -135,6 +147,44 @@ platformRouter.patch('/tenants/:id', async (req, res) => {
   }
   await audit(req, { action: data.status ? `platform.tenant_${data.status.toLowerCase()}` : 'platform.tenant_update', entityType: 'tenant', entityId: tenant.id, tenantId: tenant.id, meta: body });
   res.json(tenant);
+});
+
+/**
+ * Permanently deletes a workspace and all of its data. Only for deactivated (suspended or cancelled) workspaces, and the
+ * slug must be typed to confirm. User accounts are kept (people may belong to other workspaces); the audit log keeps
+ * a record of the deletion.
+ */
+platformRouter.delete('/tenants/:id', async (req, res) => {
+  const body = parse(z.object({ confirm: z.string().trim() }), req.body ?? {});
+  const tenant = await prisma.tenant.findUnique({ where: { id: String(req.params.id) }, select: { id: true, name: true, slug: true, status: true } });
+  if (!tenant) throw notFound('Tenant');
+  if (!['SUSPENDED', 'CANCELLED'].includes(tenant.status)) throw conflict('Deactivate the workspace before deleting it');
+  if (body.confirm !== tenant.slug) throw badRequest(`Type the workspace slug "${tenant.slug}" to confirm`, { fieldErrors: { confirm: ['Does not match'] } });
+  const defaultFeedback = await prisma.platformSetting.findUnique({ where: { key: 'defaultFeedbackTenant' } });
+  if (defaultFeedback?.value === tenant.slug) throw conflict('This workspace receives the public feedback form. Choose another default feedback workspace in Platform → Settings first.');
+  const files = await prisma.fileObject.findMany({ where: { tenantId: tenant.id }, select: { storageKey: true } });
+  const counts = await Promise.all([prisma.customer.count({ where: { tenantId: tenant.id } }), prisma.invoice.count({ where: { tenantId: tenant.id } }), prisma.membership.count({ where: { tenantId: tenant.id } })]);
+  await prisma.$transaction(async (tx) => {
+    // Rows that reference each other with RESTRICT are removed first, so the cascade from the tenant cannot trip over them.
+    await tx.paymentAllocation.deleteMany({ where: { tenantId: tenant.id } });
+    await tx.paymentRefund.deleteMany({ where: { tenantId: tenant.id } });
+    await tx.payment.deleteMany({ where: { tenantId: tenant.id } });
+    await tx.creditNote.deleteMany({ where: { tenantId: tenant.id } });
+    await tx.timeEntry.deleteMany({ where: { tenantId: tenant.id } });
+    await tx.expense.deleteMany({ where: { tenantId: tenant.id } });
+    await tx.invoice.deleteMany({ where: { tenantId: tenant.id } });
+    await tx.recurringProfile.deleteMany({ where: { tenantId: tenant.id } });
+    await tx.quotation.deleteMany({ where: { tenantId: tenant.id } });
+    await tx.proformaInvoice.deleteMany({ where: { tenantId: tenant.id } });
+    await tx.tenant.delete({ where: { id: tenant.id } });
+  }, { timeout: 120_000 });
+  // Stored files go after the records; a failed removal only leaves an orphaned object behind.
+  let filesRemoved = 0;
+  for (const f of files) {
+    try { await deleteObject(f.storageKey); filesRemoved++; } catch (e) { console.error('[platform] could not delete file', f.storageKey, e); }
+  }
+  await audit(req, { action: 'platform.tenant_delete', entityType: 'tenant', entityId: tenant.id, tenantId: null, meta: { name: tenant.name, slug: tenant.slug, customers: counts[0], invoices: counts[1], members: counts[2], files: files.length, filesRemoved } });
+  res.json({ ok: true, filesRemoved });
 });
 
 platformRouter.post('/tenants/:id/admins', async (req, res) => {
