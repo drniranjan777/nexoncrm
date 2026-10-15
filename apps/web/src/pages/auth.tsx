@@ -1,55 +1,104 @@
-import { useState, type ReactNode } from 'react';
+import { forwardRef, useState, type ComponentProps, type InputHTMLAttributes, type ReactNode } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { BarChart3, CheckCircle2, MessageSquareHeart, Receipt, ShieldCheck, Target } from 'lucide-react';
+import { AlertCircle, ArrowRight, Building2, CheckCircle2, Eye, EyeOff, Lock, Mail, User } from 'lucide-react';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useAuth, type Me } from '@/lib/auth';
 import { useAction } from '@/lib/hooks';
 import { fmtDateTime } from '@/lib/utils';
-import { NexonwebLogo, NexonwebLogoWhite } from '@/components/brand';
+import { AuthFormBackdrop, AuthShowcase, PRODUCT_NAME, TallygenLogo } from '@/components/authBrand';
+import { cn } from '@/lib/utils';
 import { Button, Card, CardHeader, EmptyState, ErrorState, Field, Input, LoadingBlock, PageHeader, Badge } from '@/components/ui';
 
 function AuthLayout({ title, subtitle, children, footer }: { title: string; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode }) {
   return (
-    <div className="grid min-h-full lg:grid-cols-[1fr_1.1fr]">
-      <div className="flex flex-col justify-center px-6 py-12 sm:px-12">
-        <div className="mx-auto w-full max-w-sm">
-          <Link to="/" className="mb-10 inline-flex" aria-label="Nexonweb home">
-            <NexonwebLogo className="h-14" />
-          </Link>
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          {subtitle && <p className="mt-1.5 text-sm text-muted">{subtitle}</p>}
-          <div className="mt-8">{children}</div>
-          {footer && <div className="mt-8 text-center text-sm text-muted">{footer}</div>}
-        </div>
-      </div>
-      <div className="relative hidden overflow-hidden bg-brand-950 lg:block">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(59,110,245,0.35),transparent_55%),radial-gradient(circle_at_80%_80%,rgba(30,58,138,0.6),transparent_50%)]" />
-        <div className="relative flex h-full flex-col justify-center px-16 text-white">
-          <NexonwebLogoWhite className="mb-10 h-16" />
-          <p className="text-sm font-medium uppercase tracking-widest text-brand-300">Business management platform</p>
-          <h2 className="mt-4 max-w-md text-4xl font-semibold leading-tight tracking-tight">Customers, sales, delivery and billing in one place.</h2>
-          <ul className="mt-10 space-y-4 text-[15px] text-brand-100">
-            {[
-              [Target, 'CRM with transparent lead scoring and automated follow-ups'],
-              [MessageSquareHeart, 'Service-specific customer feedback with tracking'],
-              [Receipt, 'GST-ready quotations, invoices and credit notes'],
-              [BarChart3, 'Reports across sales, projects, support and finance'],
-              [ShieldCheck, 'Multi-tenant isolation with granular roles'],
-            ].map(([Icon, text], i) => {
-              const I = Icon as typeof Target;
-              return <li key={i} className="flex items-center gap-3"><span className="flex size-8 items-center justify-center rounded-lg bg-white/10"><I className="size-4" /></span>{text as string}</li>;
-            })}
-          </ul>
-        </div>
-      </div>
+    <div className="grid min-h-full bg-white lg:grid-cols-[minmax(0,1.42fr)_minmax(0,1fr)]">
+      <AuthShowcase />
+      <AuthFormBackdrop>
+        <main className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-12 lg:px-14 xl:px-20">
+          <div className="mx-auto w-full max-w-[29rem]">
+            <Link to="/login" className="mb-10 inline-flex rounded-md lg:mb-12" aria-label={`${PRODUCT_NAME} sign in`}>
+              <TallygenLogo className="text-[2.6rem] sm:text-5xl xl:text-[3.6rem]" />
+            </Link>
+            <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#0b1a3d] sm:text-[2.2rem]">{title}</h1>
+            {subtitle && <p className="mt-2 text-base text-slate-500 sm:text-lg">{subtitle}</p>}
+            <div className="mt-9">{children}</div>
+            {footer && <div className="mt-8 text-center text-[15px] text-slate-600">{footer}</div>}
+          </div>
+        </main>
+      </AuthFormBackdrop>
     </div>
   );
 }
+
+/** "OR" separator between the form and the alternative action. */
+const OrDivider = () => (
+  <div className="my-7 flex items-center gap-4 text-sm font-medium text-slate-400" role="separator" aria-label="or">
+    <span className="h-px flex-1 bg-slate-200" />OR<span className="h-px flex-1 bg-slate-200" />
+  </div>
+);
+
+const authInput = 'h-12 w-full rounded-xl border border-slate-200 bg-white text-[15px] text-ink shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 disabled:text-slate-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-100';
+
+/** Labelled input with an optional leading icon and an error linked for screen readers. */
+const AuthField = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { id: string; label: ReactNode; icon?: typeof Mail; error?: string; hint?: ReactNode; labelAside?: ReactNode; trailing?: ReactNode }>(
+  ({ id, label, icon: Icon, error, hint, labelAside, trailing, className, ...props }, ref) => {
+    const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <label htmlFor={id} className="text-[15px] font-semibold text-[#0b1a3d]">{label}</label>
+          {labelAside}
+        </div>
+        <div className="relative">
+          {Icon && <Icon aria-hidden className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-slate-500" strokeWidth={1.75} />}
+          <input ref={ref} id={id} aria-invalid={!!error} aria-describedby={describedBy} className={cn(authInput, Icon ? 'pl-12' : 'pl-4', trailing ? 'pr-12' : 'pr-4', className)} {...props} />
+          {trailing}
+        </div>
+        {error ? <p id={`${id}-error`} className="text-sm text-red-600" role="alert">{error}</p> : hint ? <p id={`${id}-hint`} className="text-sm text-slate-500">{hint}</p> : null}
+      </div>
+    );
+  },
+);
+AuthField.displayName = 'AuthField';
+
+/** Password field with a show/hide toggle and a Caps Lock warning. */
+const PasswordField = forwardRef<HTMLInputElement, Omit<ComponentProps<typeof AuthField>, 'type' | 'trailing'>>(({ hint, onKeyUp, onBlur, ...props }, ref) => {
+  const [visible, setVisible] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
+  return (
+    <AuthField
+      ref={ref} type={visible ? 'text' : 'password'} icon={Lock} spellCheck={false} autoCapitalize="off" {...props}
+      hint={capsLock ? <span className="font-medium text-amber-700">Caps Lock is on</span> : hint}
+      onKeyUp={(e) => { setCapsLock(e.getModifierState('CapsLock')); onKeyUp?.(e); }}
+      onBlur={(e) => { setCapsLock(false); onBlur?.(e); }}
+      trailing={
+        <button type="button" onClick={() => setVisible((v) => !v)} aria-label={visible ? 'Hide password' : 'Show password'} aria-pressed={visible}
+          className="absolute right-2 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-brand-500">
+          {visible ? <Eye className="size-5" strokeWidth={1.75} /> : <EyeOff className="size-5" strokeWidth={1.75} />}
+        </button>
+      }
+    />
+  );
+});
+PasswordField.displayName = 'PasswordField';
+
+/** Primary action button styled for the sign-in screens. */
+const AuthSubmit = ({ children, loading, ...props }: ComponentProps<typeof Button>) => (
+  <Button {...props} loading={loading} className="h-[3.25rem] w-full rounded-xl bg-[#0b3aa8] text-[17px] font-semibold shadow-[0_10px_24px_-10px_rgba(11,58,168,0.7)] hover:bg-[#0a3290] focus-visible:outline-offset-4">
+    {children}
+  </Button>
+);
+
+const FormError = ({ children }: { children: ReactNode }) => (
+  <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert"><AlertCircle className="mt-0.5 size-4 shrink-0" />{children}</div>
+);
+
+const linkClass = 'font-semibold text-[#1847d6] underline-offset-4 hover:underline';
 
 const fieldError = (e: unknown, field: string) => (e instanceof ApiError ? e.details?.fieldErrors?.[field]?.[0] : undefined);
 
@@ -57,39 +106,40 @@ export function Login() {
   const { me, setMe } = useAuth();
   const navigate = useNavigate();
   const location = useLocation() as { state?: { from?: string } };
-  const form = useForm<{ email: string; password: string }>({ resolver: zodResolver(z.object({ email: z.string().email('Enter a valid email'), password: z.string().min(1, 'Enter your password') })) });
+  const form = useForm<{ email: string; password: string }>({ resolver: zodResolver(z.object({ email: z.string().trim().email('Enter a valid email address'), password: z.string().min(1, 'Enter your password') })) });
   const [error, setError] = useState<string | null>(null);
   if (me) return <Navigate to={location.state?.from ?? '/'} replace />;
   const submit = form.handleSubmit(async (v) => {
     setError(null);
     try {
-      const user = await api.post<Me>('/auth/login', v);
+      const user = await api.post<Me>('/auth/login', { ...v, email: v.email.trim() });
       setMe(user);
       const portalOnly = user.memberships.length > 0 && user.memberships.every((m) => m.role.key === 'customer');
       navigate(location.state?.from ?? (user.memberships.length === 0 && user.isSuperAdmin ? '/platform' : portalOnly ? '/portal' : '/'), { replace: true });
     } catch (e) {
-      setError(errorMessage(e));
+      setError(e instanceof ApiError && e.status === 429 ? 'Too many sign-in attempts. Please wait a few minutes and try again.' : errorMessage(e));
     }
   });
   return (
-    <AuthLayout title="Sign in" subtitle="Welcome back. Sign in to your workspace." footer={<>New to Nexonweb? <Link to="/register" className="font-medium text-brand-700 hover:underline">Create a workspace</Link></>}>
-      <form onSubmit={submit} className="space-y-4" noValidate>
-        {error && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</div>}
-        <Field label="Email" error={form.formState.errors.email?.message} htmlFor="email">
-          <Input id="email" type="email" autoComplete="email" autoFocus {...form.register('email')} aria-invalid={!!form.formState.errors.email} />
-        </Field>
-        <Field label={<span className="flex justify-between"><span>Password</span><Link to="/forgot-password" className="font-normal text-brand-700 hover:underline">Forgot password?</Link></span>} error={form.formState.errors.password?.message} htmlFor="password">
-          <Input id="password" type="password" autoComplete="current-password" {...form.register('password')} aria-invalid={!!form.formState.errors.password} />
-        </Field>
-        <Button type="submit" className="w-full" size="lg" loading={form.formState.isSubmitting}>Sign in</Button>
+    <AuthLayout title="Welcome back" subtitle={`Sign in to your ${PRODUCT_NAME} workspace.`}>
+      <form onSubmit={submit} className="space-y-6" noValidate aria-label="Sign in">
+        {error && <FormError>{error}</FormError>}
+        <AuthField id="email" label="Email" icon={Mail} type="email" inputMode="email" autoComplete="username" autoFocus placeholder="you@company.com"
+          error={form.formState.errors.email?.message} {...form.register('email')} />
+        <PasswordField id="password" label="Password" autoComplete="current-password" placeholder="Enter your password"
+          labelAside={<Link to="/forgot-password" className={cn(linkClass, 'text-[15px]')}>Forgot password?</Link>}
+          error={form.formState.errors.password?.message} {...form.register('password')} />
+        <AuthSubmit type="submit" loading={form.formState.isSubmitting}>Sign in{!form.formState.isSubmitting && <ArrowRight className="size-5" />}</AuthSubmit>
       </form>
+      <OrDivider />
+      <p className="text-center text-[15px] text-slate-600">New to {PRODUCT_NAME}? <Link to="/register" className={linkClass}>Create a workspace</Link></p>
     </AuthLayout>
   );
 }
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Enter your name'),
-  email: z.string().email('Enter a valid email'),
+  email: z.string().trim().email('Enter a valid email address'),
   companyName: z.string().min(2, 'Enter your company name'),
   password: z.string().min(10, 'Use at least 10 characters'),
 });
@@ -112,22 +162,24 @@ export function Register() {
     }
   });
   return (
-    <AuthLayout title="Create your workspace" subtitle="Start a 14-day trial. No card required." footer={<>Already have an account? <Link to="/login" className="font-medium text-brand-700 hover:underline">Sign in</Link></>}>
-      <form onSubmit={submit} className="space-y-4" noValidate>
-        {!!error && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{errorMessage(error)}</div>}
-        <Field label="Your name" error={e.name?.message ?? fieldError(error, 'name')}><Input autoComplete="name" {...form.register('name')} /></Field>
-        <Field label="Work email" error={e.email?.message ?? fieldError(error, 'email')}><Input type="email" autoComplete="email" {...form.register('email')} /></Field>
-        <Field label="Company name" error={e.companyName?.message}><Input autoComplete="organization" {...form.register('companyName')} /></Field>
-        <Field label="Password" error={e.password?.message ?? fieldError(error, 'password')} hint="At least 10 characters"><Input type="password" autoComplete="new-password" {...form.register('password')} /></Field>
-        <Button type="submit" className="w-full" size="lg" loading={form.formState.isSubmitting}>Create workspace</Button>
+    <AuthLayout title="Create your workspace" subtitle="Start a 14-day trial. No card required.">
+      <form onSubmit={submit} className="space-y-5" noValidate aria-label="Create your workspace">
+        {!!error && <FormError>{errorMessage(error)}</FormError>}
+        <AuthField id="name" label="Your name" icon={User} autoComplete="name" autoFocus error={e.name?.message ?? fieldError(error, 'name')} {...form.register('name')} />
+        <AuthField id="email" label="Work email" icon={Mail} type="email" inputMode="email" autoComplete="email" placeholder="you@company.com" error={e.email?.message ?? fieldError(error, 'email')} {...form.register('email')} />
+        <AuthField id="companyName" label="Company name" icon={Building2} autoComplete="organization" error={e.companyName?.message ?? fieldError(error, 'companyName')} {...form.register('companyName')} />
+        <PasswordField id="password" label="Password" autoComplete="new-password" hint="At least 10 characters" error={e.password?.message ?? fieldError(error, 'password')} {...form.register('password')} />
+        <AuthSubmit type="submit" loading={form.formState.isSubmitting}>Create workspace{!form.formState.isSubmitting && <ArrowRight className="size-5" />}</AuthSubmit>
       </form>
+      <OrDivider />
+      <p className="text-center text-[15px] text-slate-600">Already have an account? <Link to="/login" className={linkClass}>Sign in</Link></p>
     </AuthLayout>
   );
 }
 
 export function ForgotPassword() {
   const [sent, setSent] = useState(false);
-  const form = useForm<{ email: string }>({ resolver: zodResolver(z.object({ email: z.string().email('Enter a valid email') })) });
+  const form = useForm<{ email: string }>({ resolver: zodResolver(z.object({ email: z.string().trim().email('Enter a valid email address') })) });
   const submit = form.handleSubmit(async (v) => {
     try {
       await api.post('/auth/forgot-password', v);
@@ -137,13 +189,13 @@ export function ForgotPassword() {
     }
   });
   return (
-    <AuthLayout title="Reset your password" subtitle="We'll email you a secure link to set a new password." footer={<Link to="/login" className="font-medium text-brand-700 hover:underline">Back to sign in</Link>}>
+    <AuthLayout title="Reset your password" subtitle="We'll email you a secure link to set a new password." footer={<Link to="/login" className={linkClass}>Back to sign in</Link>}>
       {sent ? (
-        <div className="flex items-start gap-3 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-800"><CheckCircle2 className="mt-0.5 size-5 shrink-0" />If an account exists for that email, a reset link is on its way. It expires in 1 hour.</div>
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800" role="status"><CheckCircle2 className="mt-0.5 size-5 shrink-0" />If an account exists for that email, a reset link is on its way. It expires in 1 hour.</div>
       ) : (
-        <form onSubmit={submit} className="space-y-4" noValidate>
-          <Field label="Email" error={form.formState.errors.email?.message}><Input type="email" autoFocus {...form.register('email')} /></Field>
-          <Button type="submit" className="w-full" size="lg" loading={form.formState.isSubmitting}>Send reset link</Button>
+        <form onSubmit={submit} className="space-y-6" noValidate aria-label="Reset your password">
+          <AuthField id="email" label="Email" icon={Mail} type="email" inputMode="email" autoComplete="email" autoFocus placeholder="you@company.com" error={form.formState.errors.email?.message} {...form.register('email')} />
+          <AuthSubmit type="submit" loading={form.formState.isSubmitting}>Send reset link</AuthSubmit>
         </form>
       )}
     </AuthLayout>
@@ -167,12 +219,12 @@ export function ResetPassword() {
     }
   });
   return (
-    <AuthLayout title="Choose a new password">
-      {!token ? <p className="text-sm text-red-600">This reset link is missing its token.</p> : (
-        <form onSubmit={submit} className="space-y-4" noValidate>
-          <Field label="New password" error={form.formState.errors.password?.message}><Input type="password" autoComplete="new-password" {...form.register('password')} /></Field>
-          <Field label="Confirm password" error={form.formState.errors.confirm?.message}><Input type="password" autoComplete="new-password" {...form.register('confirm')} /></Field>
-          <Button type="submit" className="w-full" size="lg" loading={form.formState.isSubmitting}>Update password</Button>
+    <AuthLayout title="Choose a new password" subtitle="Use at least 10 characters." footer={<Link to="/login" className={linkClass}>Back to sign in</Link>}>
+      {!token ? <FormError>This reset link is incomplete. Request a new one from the sign-in page.</FormError> : (
+        <form onSubmit={submit} className="space-y-5" noValidate aria-label="Choose a new password">
+          <PasswordField id="password" label="New password" autoComplete="new-password" autoFocus error={form.formState.errors.password?.message} {...form.register('password')} />
+          <PasswordField id="confirm" label="Confirm password" autoComplete="new-password" error={form.formState.errors.confirm?.message} {...form.register('confirm')} />
+          <AuthSubmit type="submit" loading={form.formState.isSubmitting}>Update password</AuthSubmit>
         </form>
       )}
     </AuthLayout>
@@ -209,12 +261,12 @@ export function AcceptInvite() {
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-slate-600">You've been invited to <strong>{info.data.tenantName}</strong> as <Badge tone="blue">{info.data.roleName}</Badge></p>
-          <Field label="Email"><Input value={info.data.email} disabled /></Field>
-          {!info.data.hasAccount && <Field label="Your name"><Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></Field>}
-          <Field label={info.data.hasAccount ? 'Your existing password' : 'Create a password'} hint={info.data.hasAccount ? 'You already have an account. Confirm your password to join.' : 'At least 10 characters'}>
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={info.data.hasAccount ? 'current-password' : 'new-password'} />
-          </Field>
-          <Button className="w-full" size="lg" loading={busy} onClick={accept} disabled={!password || (!info.data.hasAccount && name.length < 2)}>Accept invitation</Button>
+          <AuthField id="invite-email" label="Email" icon={Mail} value={info.data.email} disabled readOnly autoComplete="username" />
+          {!info.data.hasAccount && <AuthField id="invite-name" label="Your name" icon={User} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" autoFocus />}
+          <PasswordField id="invite-password" label={info.data.hasAccount ? 'Your existing password' : 'Create a password'} value={password} onChange={(e) => setPassword(e.target.value)}
+            autoComplete={info.data.hasAccount ? 'current-password' : 'new-password'} hint={info.data.hasAccount ? 'You already have an account. Confirm your password to join.' : 'At least 10 characters'}
+            onKeyDown={(e) => { if (e.key === 'Enter' && password && (info.data!.hasAccount || name.length >= 2)) accept(); }} />
+          <AuthSubmit loading={busy} onClick={accept} disabled={!password || (!info.data.hasAccount && name.length < 2)}>Accept invitation</AuthSubmit>
         </div>
       )}
     </AuthLayout>
