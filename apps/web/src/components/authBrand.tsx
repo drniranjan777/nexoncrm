@@ -9,7 +9,9 @@ export const PRODUCT_NAME = 'Tallygen';
 export function TallygenLogo({ tone = 'dark', className }: { tone?: 'dark' | 'light'; className?: string }) {
   return (
     <span className={cn('inline-flex items-baseline font-display font-extrabold leading-none tracking-[-0.045em]', className)} role="img" aria-label={PRODUCT_NAME}>
-      <span aria-hidden className={tone === 'light' ? 'text-white' : 'bg-gradient-to-br from-[#1f5bff] via-[#1846d6] to-[#0d2a8a] bg-clip-text text-transparent'}>{PRODUCT_NAME}</span>
+      {/* Gradient text is painted only inside its own box, which with leading-none stops at the baseline area and cut
+          off the descenders of "y" and "g". The padding extends the box below them; the negative margin keeps the layout. */}
+      <span aria-hidden className={tone === 'light' ? 'text-white' : 'inline-block bg-gradient-to-br from-[#1f5bff] via-[#1846d6] to-[#0d2a8a] bg-clip-text pb-[0.2em] -mb-[0.2em] text-transparent'}>{PRODUCT_NAME}</span>
       <span aria-hidden className="text-[#f5b82e]">.</span>
     </span>
   );
