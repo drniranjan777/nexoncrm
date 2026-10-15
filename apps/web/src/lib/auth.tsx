@@ -62,11 +62,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [membership]);
 
-  useEffect(() => {
-    const onUnauthorized = () => qc.setQueryData(['me'], null);
-    window.addEventListener('nx:unauthorized', onUnauthorized);
-    return () => window.removeEventListener('nx:unauthorized', onUnauthorized);
+  /**
+   * Signed out (by the user, or because the session expired or was revoked): mark "me" as nobody, which sends every
+   * protected route to /login, and drop all other cached data so the next user never sees it.
+   * The "me" query itself must stay in the cache: removing it (queryClient.clear()) detaches the component watching
+   * it, which then keeps showing the previous user while every request fails with "Authentication required".
+   */
+  const signedOut = useCallback(() => {
+    qc.setQueryData(['me'], null);
+    qc.cancelQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
+    qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
   }, [qc]);
+
+  useEffect(() => {
+    window.addEventListener('nx:unauthorized', signedOut);
+    return () => window.removeEventListener('nx:unauthorized', signedOut);
+  }, [signedOut]);
 
   const perms = useMemo(() => new Set(membership?.role.permissions ?? []), [membership]);
   const can = useCallback((...p: string[]) => p.some((x) => perms.has(x)), [perms]);
@@ -92,12 +103,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     try {
       await api.post('/auth/logout');
+    } catch {
+      // Already signed out on the server (e.g. the session expired): finish signing out here anyway.
     } finally {
       setTenantId(null);
-      qc.clear();
-      qc.setQueryData(['me'], null);
+      setTenant(null);
+      signedOut();
     }
-  }, [qc]);
+  }, [signedOut]);
 
   const value: AuthState = {
     me, membership, can, hasModule, switchTenant, setMe, logout,

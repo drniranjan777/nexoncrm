@@ -222,14 +222,14 @@ export function AcceptInvite() {
 }
 
 export function Account() {
-  const { me, setMe } = useAuth();
+  const { me, setMe, logout } = useAuth();
   const sessions = useQuery({ queryKey: ['sessions'], queryFn: () => api.get<{ id: string; userAgent: string | null; ip: string | null; createdAt: string; lastSeenAt: string; current: boolean }[]>('/auth/sessions') });
   const [name, setName] = useState(me?.name ?? '');
   const [pw, setPw] = useState({ currentPassword: '', newPassword: '' });
   const saveName = useAction(() => api.patch<Me>('/auth/me', { name }), { success: 'Profile updated', onSuccess: (m) => setMe(m) });
   const changePw = useAction(() => api.post('/auth/change-password', pw), { success: 'Password changed. Other sessions were signed out.', invalidate: [['sessions']], onSuccess: () => setPw({ currentPassword: '', newPassword: '' }) });
   const revoke = useAction((id: string) => api.delete(`/auth/sessions/${id}`), { success: 'Session revoked', invalidate: [['sessions']] });
-  const logoutAll = useAction(() => api.post('/auth/logout-all'), { onSuccess: () => setMe(null) });
+  const logoutAll = useAction(() => api.post('/auth/logout-all'), { onSuccess: () => logout() });
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader title="Account & security" description={me?.email} />
