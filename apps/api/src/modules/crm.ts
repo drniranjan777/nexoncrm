@@ -4,7 +4,7 @@ import type { Lead, LeadStage } from '@prisma/client';
 import { prisma, type Tx } from '../lib/db.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
-import { listParams, orderBy, paged, parseCsv, qstr, searchAny, toCsv } from '../lib/list.js';
+import { listParams, orderBy, paged, parseAmount, parseCsv, qstr, searchAny, toCsv } from '../lib/list.js';
 import { nextNumber } from '../lib/numbering.js';
 import { assertTenantRefs } from '../lib/tenantRefs.js';
 import { tenantSettings } from '../lib/tenants.js';
@@ -289,39 +289,72 @@ crmRouter.post('/leads/:id/convert', requirePerm('leads.update'), requirePerm('c
   res.json(result);
 });
 
+/** Phone digits for duplicate checks: the last 10 digits, so "+91 98765 43210" and "9876543210" match. */
+const phoneKey = (phone?: string | null) => {
+  const digits = (phone ?? '').replace(/\D/g, '');
+  return digits.length >= 7 ? digits.slice(-10) : null;
+};
+
 crmRouter.post('/leads/import', requirePerm('leads.update'), async (req, res) => {
   const body = parse(z.object({ csv: z.string().min(1).max(2_000_000), skipDuplicates: z.boolean().default(true) }), req.body);
   const rows = parseCsv(body.csv);
   if (!rows.length) throw badRequest('The CSV file has no data rows');
   if (rows.length > 2000) throw badRequest('Import at most 2000 rows at a time');
+  const norm = (k: string) => k.toLowerCase().replace(/[^a-z]/g, '');
+  const columns = Object.keys(rows[0]);
+  const NAME_KEYS = ['name', 'fullname', 'contactname', 'leadname'];
+  if (!columns.some((c) => NAME_KEYS.includes(norm(c)))) {
+    throw badRequest(`No "name" column found. The header row has: ${columns.slice(0, 10).map((c) => `"${c.slice(0, 40)}"`).join(', ')}. Use a comma-, tab- or semicolon-separated file whose first row names the columns.`);
+  }
   const pick = (r: Record<string, string>, ...keys: string[]) => {
     for (const k of keys) {
-      const hit = Object.keys(r).find((rk) => rk.toLowerCase().replace(/[^a-z]/g, '') === k);
+      const hit = Object.keys(r).find((rk) => norm(rk) === k);
       if (hit && r[hit]) return r[hit];
     }
     return undefined;
   };
+  // Existing leads, for duplicate checks by email or phone.
+  const existing = body.skipDuplicates ? await prisma.lead.findMany({ where: { tenantId: tid(req) }, select: { name: true, email: true, phone: true } }) : [];
+  const emails = new Set(existing.map((l) => l.email?.toLowerCase()).filter(Boolean));
+  const phones = new Set(existing.map((l) => phoneKey(l.phone)).filter(Boolean));
+  // Leads without any contact detail can only be matched by name.
+  const nameKey = (name: string) => name.toLowerCase().replace(/\s+/g, ' ').trim();
+  const bareNames = new Set(existing.filter((l) => !l.email && !phoneKey(l.phone)).map((l) => nameKey(l.name)));
   let created = 0;
   const skipped: { row: number; reason: string }[] = [];
   for (const [i, r] of rows.entries()) {
+    const row = i + 2; // header is row 1
+    const rawValue = pick(r, 'estimatedvalue', 'dealvalue', 'value', 'amount');
+    const value = parseAmount(rawValue);
+    if (Number.isNaN(value)) { skipped.push({ row, reason: `Value "${rawValue}" is not an amount` }); continue; }
     const parsed = leadSchema.safeParse({
-      name: pick(r, 'name', 'fullname', 'contactname'),
-      company: pick(r, 'company', 'organization', 'organisation'),
-      email: pick(r, 'email', 'emailaddress'),
-      phone: pick(r, 'phone', 'mobile', 'phonenumber'),
+      name: pick(r, ...NAME_KEYS),
+      company: pick(r, 'company', 'organization', 'organisation', 'companyname'),
+      email: pick(r, 'email', 'emailaddress', 'emailid')?.toLowerCase(),
+      phone: pick(r, 'phone', 'mobile', 'phonenumber', 'mobilenumber', 'contactnumber'),
       source: pick(r, 'source', 'leadsource') ?? 'CSV import',
       serviceInterest: pick(r, 'serviceinterest', 'service'),
       budgetRange: pick(r, 'budgetrange', 'budget'),
-      estimatedValue: pick(r, 'estimatedvalue', 'dealvalue', 'value'),
-      notes: pick(r, 'notes', 'note'),
+      estimatedValue: value,
+      notes: pick(r, 'notes', 'note', 'remarks', 'comments'),
     });
-    if (!parsed.success) { skipped.push({ row: i + 2, reason: parsed.error.issues[0]?.message ?? 'Invalid row' }); continue; }
-    const d = parsed.data;
-    if (body.skipDuplicates && d.email) {
-      const dup = await prisma.lead.findFirst({ where: { tenantId: tid(req), email: { equals: d.email, mode: 'insensitive' } }, select: { id: true } });
-      if (dup) { skipped.push({ row: i + 2, reason: `Duplicate email ${d.email}` }); continue; }
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      skipped.push({ row, reason: issue ? `${issue.path.join('.') || 'Row'}: ${issue.message}` : 'Invalid row' });
+      continue;
     }
-    const lead = await prisma.lead.create({ data: { ...d, email: d.email?.toLowerCase(), tenantId: tid(req), assignedToId: req.user!.id } });
+    const d = parsed.data;
+    const pk = phoneKey(d.phone);
+    if (body.skipDuplicates) {
+      // Matches leads already saved and earlier rows of this file.
+      if (d.email && emails.has(d.email)) { skipped.push({ row, reason: `Duplicate email ${d.email}` }); continue; }
+      if (pk && phones.has(pk)) { skipped.push({ row, reason: `Duplicate phone ${d.phone}` }); continue; }
+      if (!d.email && !pk && bareNames.has(nameKey(d.name))) { skipped.push({ row, reason: `Duplicate lead ${d.name} (no email or phone)` }); continue; }
+    }
+    const lead = await prisma.lead.create({ data: { ...d, tenantId: tid(req), assignedToId: req.user!.id } });
+    if (d.email) emails.add(d.email);
+    if (pk) phones.add(pk);
+    if (!d.email && !pk) bareNames.add(nameKey(d.name));
     await rescoreLead(tid(req), lead.id);
     created++;
   }

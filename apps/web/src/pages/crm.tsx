@@ -79,18 +79,26 @@ function LeadFormDialog({ open, onOpenChange, lead, onSaved }: { open: boolean; 
   );
 }
 
+/** Reads a CSV as UTF-8, or as Windows-1252 (Excel's plain "CSV" on Windows) when it is not valid UTF-8. */
+async function readCsvFile(f: File) {
+  const bytes = await f.arrayBuffer();
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { return new TextDecoder('windows-1252').decode(bytes); }
+}
+
 function ImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const [csv, setCsv] = useState('');
+  const [fileName, setFileName] = useState('');
   const [result, setResult] = useState<{ created: number; skipped: { row: number; reason: string }[] } | null>(null);
   const file = useRef<HTMLInputElement>(null);
-  const run = useAction(() => api.post<NonNullable<typeof result>>('/leads/import', { csv, skipDuplicates: true }), { invalidate: [['/leads']], onSuccess: (r) => { setResult(r); toast.success(`${r.created} leads imported`); } });
+  const run = useAction(() => api.post<NonNullable<typeof result>>('/leads/import', { csv, skipDuplicates: true }), { invalidate: [['/leads']], onSuccess: (r) => { setResult(r); setCsv(''); toast.success(`${r.created} leads imported`); } });
   return (
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) { setCsv(''); setResult(null); } }} title="Import leads from CSV" size="lg"
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) { setCsv(''); setFileName(''); setResult(null); } }} title="Import leads from CSV" size="lg"
       footer={<><Button variant="secondary" onClick={() => onOpenChange(false)}>Close</Button><Button onClick={() => run.mutate()} loading={run.isPending} disabled={!csv}>Import</Button></>}>
-      <p className="mb-3 text-sm text-slate-600">Columns recognised: <code className="text-xs">name, company, email, phone, source, service, budget, value, notes</code>. Rows whose email already exists are skipped.</p>
-      <input ref={file} type="file" accept=".csv,text/csv" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} />
+      <p className="mb-3 text-sm text-slate-600">Comma-, tab- or semicolon-separated, with a header row. Columns recognised: <code className="text-xs">name, company, email, phone, source, service, budget, value, notes</code>. Values such as <code className="text-xs">₹ 1,30,000</code> are understood. Rows whose email or phone already exists (or repeats in the file) are skipped.</p>
+      <input ref={file} type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" className="hidden"
+        onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) { setCsv(await readCsvFile(f)); setFileName(f.name); setResult(null); } }} />
       <Button variant="secondary" onClick={() => file.current?.click()}><Upload /> Choose CSV file</Button>
-      {csv && <p className="mt-2 text-sm text-muted">{csv.split(/\r?\n/).filter(Boolean).length - 1} data rows loaded</p>}
+      {csv && <p className="mt-2 text-sm text-muted">{fileName}: {csv.split(/\r?\n/).filter((l) => l.trim()).length - 1} data rows loaded</p>}
       {result && (
         <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
           <p className="font-medium">{result.created} created, {result.skipped.length} skipped</p>

@@ -62,7 +62,16 @@ export function toCsv(rows: Record<string, unknown>[], columns: string[]) {
   return [columns.join(','), ...rows.map((r) => columns.map((c) => esc(r[c])).join(','))].join('\n');
 }
 
-export function parseCsv(text: string): Record<string, string>[] {
+/** Picks the delimiter used in the header line: comma, tab (TSV / pasted from a spreadsheet) or semicolon (Excel in some regions). */
+function detectDelimiter(text: string) {
+  const header = text.slice(0, text.search(/\r?\n|$/));
+  const count = (d: string) => header.replace(/"[^"]*"/g, '').split(d).length - 1;
+  return [',', '\t', ';'].reduce((best, d) => (count(d) > count(best) ? d : best), ',');
+}
+
+export function parseCsv(input: string): Record<string, string>[] {
+  const text = input.replace(/^\uFEFF/, ''); // byte-order mark added by Excel
+  const delimiter = detectDelimiter(text);
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = '';
@@ -74,7 +83,7 @@ export function parseCsv(text: string): Record<string, string>[] {
       else if (ch === '"') quoted = false;
       else cell += ch;
     } else if (ch === '"') quoted = true;
-    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === delimiter) { row.push(cell); cell = ''; }
     else if (ch === '\n' || ch === '\r') {
       if (ch === '\r' && text[i + 1] === '\n') i++;
       row.push(cell); rows.push(row); row = []; cell = '';
@@ -85,4 +94,19 @@ export function parseCsv(text: string): Record<string, string>[] {
   if (!header) return [];
   const keys = header.map((h) => h.trim());
   return body.map((r) => Object.fromEntries(keys.map((k, i) => [k, (r[i] ?? '').trim()])));
+}
+
+/**
+ * Reads an amount typed by people or exported by other tools: "35000", "35,000.00", "₹ 1,30,000", "Rs. 25,000/-",
+ * "INR 9,000" and values whose currency symbol was lost in a character-set conversion ("? 35,000.00").
+ * Grouping commas (Indian or western) are dropped. Returns null when empty, NaN when it is not an amount.
+ */
+export function parseAmount(raw: string | null | undefined): number | null {
+  const s = (raw ?? '').trim();
+  if (!s) return null;
+  const cleaned = s
+    .replace(/^(?:[A-Za-z]{2,3}\.?|[^\d\s.,+-]+)\s*/, '') // leading currency code or symbol(s): INR, Rs., ₹, $, ?, …
+    .replace(/\s*(?:\/-|[A-Za-z]{2,3}\.?)$/, '') // trailing "/-" or currency code
+    .replace(/[\s,]/g, '');
+  return /^-?\d+(\.\d+)?$/.test(cleaned) ? Number(cleaned) : NaN;
 }
