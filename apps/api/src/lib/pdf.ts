@@ -205,31 +205,91 @@ function partyLines(p: Party) {
 const PAGE_BOTTOM = 770; // keep clear of the footer line at 790
 
 const AUTH_WIDTH = 230;
-const authImageHeight = (a: AuthorizationBlock) => (a.seal || a.signature ? 90 : 30); // without images, leave a short space for a wet signature
-const authHeight = (a: AuthorizationBlock) => 16 + authImageHeight(a) + 46;
+const NAVY = '#0f2a5c';
+const ACCENT = '#0f766e';
+const authImageHeight = (a: AuthorizationBlock) => (a.seal || a.signature ? 96 : 30); // without images, leave a short space for a wet signature
+const authHeight = (a: AuthorizationBlock) => 22 + authImageHeight(a) + 40;
 
-/** "For <Company>", the signature stamped over the seal, then the signatory's name and designation. */
+/** Shaded section title with an accent bar on the left. Returns where the section's content starts. */
+function sectionHeader(pdf: PDFKit.PDFDocument, title: string, x: number, y: number, w: number) {
+  pdf.roundedRect(x, y, w, 17, 3).fill('#e8f0fa');
+  pdf.rect(x, y, 3, 17).fill(ACCENT);
+  pdf.font(F.bold).fontSize(8.5).fillColor(NAVY).text(title.toUpperCase(), x + 12, y + 4.5, { width: w - 16, characterSpacing: 0.9, lineBreak: false });
+  return y + 25;
+}
+
+// "ACCOUNT NUMBER - 5020…", "IFSC Code: HDFC…": a short label with no digits, then ":" or "-", then the value.
+const KEY_VALUE = /^([A-Za-z][A-Za-z .&/()']{1,38}?)\s*[:\-–]\s*(?!\/)(\S.*)$/;
+
+/**
+ * A notes / terms section in the reference style. A first line ending in ":" ("BANK ACCOUNT DETAIL:") becomes the
+ * section title; "LABEL - value" lines are laid out as an aligned label : value table; terms are shown as bullets.
+ * With `measure`, nothing is drawn and the returned y tells how tall the section would be.
+ */
+function drawNoteSection(pdf: PDFKit.PDFDocument, fallbackTitle: string, body: string, bullets: boolean, x: number, y: number, w: number, measure = false) {
+  const lines = body.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  let title = fallbackTitle;
+  if (lines.length > 1 && lines[0].endsWith(':') && !KEY_VALUE.test(lines[0].slice(0, -1))) title = lines.shift()!.slice(0, -1);
+  const pairs = lines.map((l) => KEY_VALUE.exec(l));
+  const table = !bullets && pairs.filter(Boolean).length >= 2;
+  const ensure = (h: number) => { if (!measure && y + h > PAGE_BOTTOM) { pdf.addPage(); y = 50; } };
+
+  ensure(40);
+  y = measure ? y + 25 : sectionHeader(pdf, title, x, y, w);
+  pdf.fontSize(8.5);
+  const labelW = table ? Math.min(130, Math.max(...pairs.map((m) => (m ? pdf.font(F.regular).widthOfString(m[1].toUpperCase()) : 0)))) : 0;
+  lines.forEach((line, i) => {
+    const m = pairs[i];
+    if (table && m) {
+      const valueX = x + 4 + labelW + 18;
+      const h = Math.max(pdf.font(F.bold).heightOfString(m[2], { width: x + w - valueX }), 11);
+      ensure(h);
+      if (!measure) {
+        pdf.font(F.regular).fillColor('#334155').text(m[1].toUpperCase(), x + 4, y, { width: labelW, lineBreak: false, ellipsis: true });
+        pdf.text(':', x + 4 + labelW + 6, y, { lineBreak: false });
+        pdf.font(F.bold).fillColor(NAVY).text(m[2], valueX, y, { width: x + w - valueX });
+      }
+      y += h + 5;
+    } else if (bullets) {
+      const h = pdf.font(F.regular).heightOfString(line, { width: w - 18 });
+      ensure(h);
+      if (!measure) {
+        pdf.circle(x + 6, y + 4.5, 2).fill(ACCENT);
+        pdf.fillColor('#1e293b').text(line, x + 16, y, { width: w - 18 });
+      }
+      y += h + 4;
+    } else {
+      const h = pdf.font(F.regular).heightOfString(line, { width: w - 4 });
+      ensure(h);
+      if (!measure) pdf.fillColor('#1e293b').text(line, x + 4, y, { width: w - 4 });
+      y += h + 4;
+    }
+  });
+  return y + 10;
+}
+
+/** "For <Company>", the signature stamped over the seal, then the signatory's name and designation, centred. */
 function drawAuthorization(pdf: PDFKit.PDFDocument, a: AuthorizationBlock, y: number, right: number) {
   const width = AUTH_WIDTH;
   const x = right - width;
   const imgH = authImageHeight(a);
   if (y + authHeight(a) > PAGE_BOTTOM) { pdf.addPage(); y = 50; }
-  pdf.font(F.bold).fontSize(9).fillColor('#0f172a').text(`For ${a.company}`, x, y, { width, align: 'right' });
-  const top = y + 16;
-  // Seal and signature share one centre near the right edge; the signature is drawn last so it sits on top of the
-  // seal, as when a document is signed across its stamp. Both keep their aspect ratio inside fixed boxes.
-  const cx = right - 75;
+  pdf.font(F.bold).fontSize(11).fillColor(NAVY).text(`For ${a.company}`, x, y + 2, { width, align: 'center' });
+  const top = pdf.y + 6;
+  // Seal and signature share one centre; the signature is drawn last so it sits on top of the seal, as when a
+  // document is signed across its stamp. Both keep their aspect ratio inside fixed boxes.
+  const cx = x + width / 2;
   if (a.seal) {
     try { pdf.image(a.seal, cx - imgH / 2, top, { fit: [imgH, imgH], align: 'center', valign: 'center' }); } catch { /* unreadable image: skipped */ }
   }
   if (a.signature) {
-    try { pdf.image(a.signature, cx - 75, top + 15, { fit: [150, imgH - 30], align: 'center', valign: 'center' }); } catch { /* skipped */ }
+    try { pdf.image(a.signature, cx - 70, top + 18, { fit: [140, imgH - 36], align: 'center', valign: 'center' }); } catch { /* skipped */ }
   }
-  const lineY = top + imgH + 4;
-  pdf.moveTo(x + 40, lineY).lineTo(right, lineY).strokeColor('#cbd5e1').lineWidth(0.7).stroke();
-  pdf.font(F.bold).fontSize(8.5).fillColor('#0f172a').text('Authorized Signatory', x, lineY + 5, { width, align: 'right' });
+  const lineY = top + imgH + 6;
+  pdf.moveTo(x + 8, lineY).lineTo(right - 8, lineY).strokeColor(NAVY).lineWidth(1).stroke();
+  pdf.font(F.bold).fontSize(9.5).fillColor(NAVY).text('Authorized Signatory', x, lineY + 7, { width, align: 'center' });
   const who = [a.signatoryName, a.designation].filter(Boolean).join(', ');
-  if (who) pdf.font(F.regular).fontSize(8).fillColor('#475569').text(who, x, pdf.y + 1, { width, align: 'right' });
+  if (who) pdf.font(F.regular).fontSize(8.5).fillColor('#334155').text(who, x, pdf.y + 2, { width, align: 'center' });
   return pdf.y + 6;
 }
 
@@ -395,20 +455,31 @@ function draw(pdf: PDFKit.PDFDocument, doc: FinancialDoc) {
   // The signatory block sits to the right of the notes and terms, on the page where they start, whenever it fits
   // there; the notes then wrap in the narrower left column. Otherwise it follows them as before.
   const auth = doc.authorization;
+  const sections = ([['Notes', doc.notes, false], ['Payment Instructions', doc.paymentInstructions, false], ['Terms & Conditions', doc.terms, true]] as const)
+    .filter(([, body]) => body?.trim());
+  const sideW = width - AUTH_WIDTH - 30;
+  const notesHeight = (w: number) => sections.reduce((h, [label, body, bullets], i) => h + (i ? 10 : 0) + drawNoteSection(pdf, label, body as string, bullets, left, 0, w, true), 0);
+  // Keep the notes and the signatory together: if they don't fit in what is left of this page but would fit on a
+  // fresh one, start them there rather than splitting the bank details across pages.
+  const blockH = auth ? Math.max(notesHeight(sideW), authHeight(auth)) : notesHeight(width);
+  if (sections.length + (auth ? 1 : 0) > 0 && y + blockH > PAGE_BOTTOM && 50 + blockH <= PAGE_BOTTOM) { pdf.addPage(); y = 50; }
   const beside = auth && y + authHeight(auth) <= PAGE_BOTTOM ? { y, page: pdf.bufferedPageRange().count - 1 } : null;
-  const textW = beside ? width - AUTH_WIDTH - 20 : width;
-  for (const [label, body] of [['NOTES', doc.notes], ['PAYMENT INSTRUCTIONS', doc.paymentInstructions], ['TERMS & CONDITIONS', doc.terms]] as const) {
-    if (!body) continue;
-    if (y > 730) { pdf.addPage(); y = 50; }
-    pdf.font(F.bold).fontSize(8).fillColor('#64748b').text(label, left, y);
-    pdf.font(F.regular).fontSize(8.5).fillColor('#334155').text(body, left, y + 12, { width: textW });
-    y = pdf.y + 14;
-  }
+  const textW = beside ? sideW : width;
+  sections.forEach(([label, body, bullets], i) => {
+    if (i > 0) {
+      pdf.moveTo(left, y - 2).lineTo(left + textW, y - 2).strokeColor('#cbd5e1').lineWidth(0.7).stroke();
+      y += 10;
+    }
+    y = drawNoteSection(pdf, label, body as string, bullets, left, y, textW);
+  });
 
   if (auth && beside) {
     const last = pdf.bufferedPageRange().count - 1;
     pdf.switchToPage(pdf.bufferedPageRange().start + beside.page);
     const end = drawAuthorization(pdf, auth, beside.y, right);
+    // Vertical rule between the notes and the signatory column.
+    const ruleX = right - AUTH_WIDTH - 15;
+    pdf.moveTo(ruleX, beside.y).lineTo(ruleX, last === beside.page ? Math.max(y - 6, end) : end).strokeColor('#cbd5e1').lineWidth(0.7).stroke();
     pdf.switchToPage(pdf.bufferedPageRange().start + last);
     if (last === beside.page) y = Math.max(y, end);
   } else if (auth) {
