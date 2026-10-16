@@ -18,10 +18,14 @@ export interface NavItem {
 export interface NavGroup {
   label: string;
   items: NavItem[];
+  /** 'bottom': shown as a menu pinned to the bottom of the sidebar instead of in the scrolling list. */
+  placement?: 'bottom';
+  /** Always expanded, without a collapsible header (e.g. Overview). */
+  fixed?: boolean;
 }
 
 export const NAV: NavGroup[] = [
-  { label: 'Overview', items: [{ label: 'Home', to: '/', icon: LayoutDashboard, perms: ['dashboard.read'] }] },
+  { label: 'Overview', fixed: true, items: [{ label: 'Home', to: '/', icon: LayoutDashboard, perms: ['dashboard.read'] }] },
   {
     label: 'Customers',
     items: [
@@ -90,6 +94,7 @@ export const NAV: NavGroup[] = [
   },
   {
     label: 'Settings',
+    placement: 'bottom',
     items: [
       { label: 'Company Profile', to: '/settings/company', icon: Building2, perms: ['settings.manage'] },
       { label: 'Organizations', to: '/organizations', icon: Building },

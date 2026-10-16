@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Popover from '@radix-ui/react-popover';
-import { Bell, Building, Check, ChevronDown, ChevronsLeft, ChevronsRight, LogOut, Menu, Plus, Search, Settings, ShieldCheck, User, X } from 'lucide-react';
+import { Bell, Building, Check, ChevronDown, ChevronsLeft, ChevronsRight, ChevronUp, LogOut, Menu, Plus, Search, Settings, ShieldCheck, User, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { cn, timeAgo } from '@/lib/utils';
@@ -22,7 +22,88 @@ function useCollapsed() {
   return [collapsed, toggle] as const;
 }
 
+const OPEN_KEY = 'nx.nav.open';
+const isActivePath = (pathname: string, to: string) => (to === '/' || to === '/portal' || to === '/platform' ? pathname === to : pathname === to || pathname.startsWith(`${to}/`));
+
+/** Which collapsible groups are open, remembered per browser. The group holding the current page always opens. */
+function useOpenGroups(groups: NavGroup[], pathname: string) {
+  const [open, setOpen] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}') as Record<string, boolean>; } catch { return {}; }
+  });
+  const activeGroup = groups.find((g) => g.items.some((it) => isActivePath(pathname, it.to)))?.label;
+  useEffect(() => {
+    if (activeGroup && !open[activeGroup]) setOpen((o) => ({ ...o, [activeGroup]: true }));
+  }, [activeGroup]); // runs when the page changes group; `open` is read, not a trigger
+  useEffect(() => { try { localStorage.setItem(OPEN_KEY, JSON.stringify(open)); } catch { /* private mode */ } }, [open]);
+  const toggle = (label: string) => setOpen((o) => ({ ...o, [label]: !o[label] }));
+  return { isOpen: (label: string) => !!open[label], toggle };
+}
+
+const itemClass = (active: boolean, collapsed: boolean) => cn(
+  'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13.5px] font-medium transition-colors',
+  active ? 'bg-brand-50 text-brand-800' : 'text-slate-600 hover:bg-slate-50 hover:text-ink',
+  collapsed && 'lg:justify-center lg:px-0 lg:py-2',
+);
+
+function NavItems({ items, collapsed, onNavigate, id }: { items: NavGroup['items']; collapsed: boolean; onNavigate: () => void; id?: string }) {
+  return (
+    <ul id={id} className="space-y-0.5">
+      {items.map((it) => (
+        <li key={it.to}>
+          <NavLink to={it.to} end={it.to === '/' || it.to === '/portal' || it.to === '/platform'} onClick={onNavigate} title={collapsed ? it.label : undefined}
+            className={({ isActive }) => itemClass(isActive, collapsed)}>
+            <it.icon className="size-[17px] shrink-0" />
+            <span className={cn('truncate', collapsed && 'lg:hidden')}>{it.label}</span>
+          </NavLink>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Settings pinned to the bottom of the sidebar: a menu of every settings page. */
+function SettingsMenu({ group, collapsed, onNavigate }: { group: NavGroup; collapsed: boolean; onNavigate: () => void }) {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const active = group.items.some((it) => isActivePath(pathname, it.to));
+  return (
+    <div className="border-t border-line px-3 py-2">
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger title={collapsed ? group.label : undefined}
+          className={cn(itemClass(active, collapsed), 'w-full outline-none focus-visible:ring-2 focus-visible:ring-brand-300 data-[state=open]:bg-slate-100 data-[state=open]:text-ink')}>
+          <Settings className="size-[17px] shrink-0" />
+          <span className={cn('flex-1 truncate text-left', collapsed && 'lg:hidden')}>{group.label}</span>
+          <ChevronUp className={cn('size-4 shrink-0 text-slate-400', collapsed && 'lg:hidden')} />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content side="top" align="start" sideOffset={6} collisionPadding={8}
+            className="z-50 max-h-[min(32rem,calc(100vh-6rem))] w-60 overflow-y-auto rounded-xl border border-line bg-white p-1.5 shadow-lg">
+            <DropdownMenu.Label className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{group.label}</DropdownMenu.Label>
+            {group.items.map((it) => {
+              const on = isActivePath(pathname, it.to);
+              return (
+                <DropdownMenu.Item key={it.to} onSelect={() => { navigate(it.to); onNavigate(); }} aria-current={on ? 'page' : undefined}
+                  className={cn('flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13.5px] outline-none data-[highlighted]:bg-slate-50', on ? 'font-medium text-brand-800' : 'text-slate-700')}>
+                  <it.icon className="size-4 shrink-0 text-slate-500" />
+                  <span className="flex-1 truncate">{it.label}</span>
+                  {on && <Check className="size-4 text-brand-700" />}
+                </DropdownMenu.Item>
+              );
+            })}
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
+    </div>
+  );
+}
+
 function Sidebar({ groups, collapsed, onToggle, mobileOpen, onClose, brand }: { groups: NavGroup[]; collapsed: boolean; onToggle: () => void; mobileOpen: boolean; onClose: () => void; brand: ReactNode }) {
+  const { pathname } = useLocation();
+  const main = groups.filter((g) => g.placement !== 'bottom');
+  const bottom = groups.filter((g) => g.placement === 'bottom');
+  // A lone group (portal, platform) or a fixed one has nothing to fold.
+  const foldable = (g: NavGroup) => !g.fixed && main.length > 1;
+  const { isOpen, toggle } = useOpenGroups(main.filter(foldable), pathname);
   return (
     <>
       {mobileOpen && <div className="fixed inset-0 z-30 bg-slate-900/30 lg:hidden" onClick={onClose} />}
@@ -39,32 +120,33 @@ function Sidebar({ groups, collapsed, onToggle, mobileOpen, onClose, brand }: { 
           <button className="ml-auto rounded-md p-1 text-slate-400 hover:bg-slate-100 lg:hidden" onClick={onClose} aria-label="Close menu"><X className="size-4" /></button>
         </div>
         <nav className="scrollbar-thin flex-1 overflow-y-auto px-3 py-3">
-          {groups.map((g) => (
-            <div key={g.label} className="mb-4">
-              <p className={cn('mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400', collapsed && 'lg:sr-only')}>{g.label}</p>
-              <ul className="space-y-0.5">
-                {g.items.map((it) => (
-                  <li key={it.to}>
-                    <NavLink
-                      to={it.to}
-                      end={it.to === '/' || it.to === '/portal' || it.to === '/platform'}
-                      onClick={onClose}
-                      title={collapsed ? it.label : undefined}
-                      className={({ isActive }) => cn(
-                        'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13.5px] font-medium transition-colors',
-                        isActive ? 'bg-brand-50 text-brand-800' : 'text-slate-600 hover:bg-slate-50 hover:text-ink',
-                        collapsed && 'lg:justify-center lg:px-0 lg:py-2',
-                      )}
-                    >
-                      <it.icon className="size-[17px] shrink-0" />
-                      <span className={cn('truncate', collapsed && 'lg:hidden')}>{it.label}</span>
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {main.map((g) => {
+            const id = `nav-${g.label.replace(/\W+/g, '-').toLowerCase()}`;
+            if (!foldable(g)) {
+              return (
+                <div key={g.label} className="mb-3">
+                  {main.length > 1 && g.label !== 'Overview' && <p className={cn('mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400', collapsed && 'lg:sr-only')}>{g.label}</p>}
+                  <NavItems items={g.items} collapsed={collapsed} onNavigate={onClose} />
+                </div>
+              );
+            }
+            const open = isOpen(g.label);
+            return (
+              <div key={g.label} className="mb-1">
+                <button type="button" onClick={() => toggle(g.label)} aria-expanded={open} aria-controls={id}
+                  className={cn('group flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 hover:bg-slate-50 hover:text-slate-600', collapsed && 'lg:hidden')}>
+                  <span className="flex-1 text-left">{g.label}</span>
+                  <ChevronDown className={cn('size-3.5 transition-transform', !open && '-rotate-90')} />
+                </button>
+                {/* Icon-only sidebar: every item stays visible, there is no header to unfold. */}
+                <div className={cn('pb-2', !open && 'hidden', collapsed && 'lg:block')}>
+                  <NavItems id={id} items={g.items} collapsed={collapsed} onNavigate={onClose} />
+                </div>
+              </div>
+            );
+          })}
         </nav>
+        {bottom.map((g) => <SettingsMenu key={g.label} group={g} collapsed={collapsed} onNavigate={onClose} />)}
         <button onClick={onToggle} className="hidden h-11 items-center justify-center gap-2 border-t border-line text-[13px] text-muted hover:bg-slate-50 hover:text-ink lg:flex" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
           {collapsed ? <ChevronsRight className="size-4" /> : <><ChevronsLeft className="size-4" /> Collapse</>}
         </button>
