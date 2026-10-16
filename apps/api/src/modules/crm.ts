@@ -114,7 +114,8 @@ crmRouter.get('/leads', requirePerm('leads.read'), async (req, res) => {
     return res.send(toCsv(rows as never, ['name', 'company', 'email', 'phone', 'source', 'serviceInterest', 'budgetRange', 'estimatedValue', 'stage', 'score', 'nextFollowUpAt', 'createdAt']));
   }
   const [items, total] = await Promise.all([
-    prisma.lead.findMany({ where, orderBy: orderBy(p), skip: p.skip, take: p.pageSize }),
+    // id breaks ties (e.g. leads imported in the same instant) so pages never repeat or skip rows.
+    prisma.lead.findMany({ where, orderBy: [orderBy(p) ?? { createdAt: 'desc' }, { id: p.dir }], skip: p.skip, take: p.pageSize }),
     prisma.lead.count({ where }),
   ]);
   res.json(paged(items, total, p));

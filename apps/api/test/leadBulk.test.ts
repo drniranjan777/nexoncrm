@@ -48,6 +48,18 @@ describe.skipIf(!run)('lead bulk actions', () => {
   });
   afterAll(async () => { await prisma?.$disconnect(); });
 
+  it('lists the newest lead first by default', async () => {
+    const fresh = await as(a).post('/leads', { name: 'Just Added Lead' });
+    expect(fresh.status).toBe(201);
+    const list = await as(a).get('/leads');
+    expect(list.body.items[0].id).toBe(fresh.body.id);
+    // Leads imported in the same instant still page consistently (no repeats across pages).
+    const p1 = (await as(a).get('/leads?pageSize=100&page=1')).body.items.map((l: { id: string }) => l.id);
+    const p2 = (await as(a).get('/leads?pageSize=100&page=2')).body.items.map((l: { id: string }) => l.id);
+    expect(p1.filter((id: string) => p2.includes(id))).toEqual([]);
+    await prisma.lead.delete({ where: { id: fresh.body.id } });
+  });
+
   it('returns pages of 50, 100 and up to 2000 ("All")', async () => {
     for (const size of [50, 100]) {
       const r = await as(a).get(`/leads?pageSize=${size}`);

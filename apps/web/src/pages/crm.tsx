@@ -150,7 +150,7 @@ export function LeadsList() {
   const { can } = useAuth();
   const navigate = useNavigate();
   const members = useMembers();
-  const list = useList<Lead>('/leads', { stage: '', serviceInterest: '', assignedToId: '' }, { sort: 'score', storageKey: 'leads' });
+  const list = useList<Lead>('/leads', { stage: '', serviceInterest: '', assignedToId: '' }, { sort: 'createdAt', storageKey: 'leads' }); // newest leads first
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   // Selection: picked ids (kept across pages), or every lead matching the filters.
@@ -204,7 +204,8 @@ export function LeadsList() {
                 <TH><button onClick={() => list.toggleSort('score')}>Score {list.sort.sort === 'score' && (list.sort.dir === 'desc' ? '↓' : '↑')}</button></TH>
                 <TH>Lead</TH><TH>Service</TH><TH>Stage</TH>
                 <TH className="text-right"><button onClick={() => list.toggleSort('estimatedValue')}>Value {list.sort.sort === 'estimatedValue' && (list.sort.dir === 'desc' ? '↓' : '↑')}</button></TH>
-                <TH><button onClick={() => list.toggleSort('nextFollowUpAt')}>Next follow-up</button></TH><TH>Owner</TH>
+                <TH><button onClick={() => list.toggleSort('nextFollowUpAt')}>Next follow-up {list.sort.sort === 'nextFollowUpAt' && (list.sort.dir === 'desc' ? '↓' : '↑')}</button></TH><TH>Owner</TH>
+                <TH><button onClick={() => list.toggleSort('createdAt')}>Added {list.sort.sort === 'createdAt' && (list.sort.dir === 'desc' ? '↓' : '↑')}</button></TH>
               </tr></THead>
               <TBody>
                 {list.data.items.map((l) => {
@@ -219,6 +220,7 @@ export function LeadsList() {
                       <TD className="text-right tabular-nums">{l.estimatedValue ? inrCompact(l.estimatedValue) : '—'}</TD>
                       <TD className={overdue ? 'font-medium text-red-600' : 'text-slate-600'}>{fmtDate(l.nextFollowUpAt)}</TD>
                       <TD className="text-slate-600">{memberName(members.data, l.assignedToId)}</TD>
+                      <TD className="whitespace-nowrap text-slate-600">{fmtDate(l.createdAt)}</TD>
                     </TR>
                   );
                 })}
