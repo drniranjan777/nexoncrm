@@ -41,7 +41,6 @@ export interface FinancialDoc {
   /** Label of the number row, e.g. "Proforma Invoice No.". */
   numberLabel?: string;
   issueDate: Date;
-  secondaryDate?: { label: string; value: Date | null };
   /** Extra header rows, e.g. Reference#, Order number, Terms, Salesperson. */
   meta?: [string, string | null | undefined][];
   reference?: string;
@@ -327,10 +326,8 @@ function draw(pdf: PDFKit.PDFDocument, doc: FinancialDoc) {
   pdf.font(F.bold).fontSize(18).fillColor(brand).text(doc.title, 300, 30, { width: right - 300, align: 'right' });
   pdf.font(F.regular).fontSize(9);
   const meta: [string, string][] = [[doc.numberLabel ?? 'Number', doc.number], ['Date', fmtDate(doc.issueDate)]];
-  if (doc.secondaryDate?.value) meta.push([doc.secondaryDate.label, fmtDate(doc.secondaryDate.value)]);
   for (const [k, v] of doc.meta ?? []) if (v) meta.push([k, v]);
   if (doc.reference) meta.push(['Reference', doc.reference]);
-  meta.push(['Currency', `${cur.code}${cur.name ? ` - ${cur.name}` : ''}`]);
   let my = 58;
   for (const [k, v] of meta) {
     pdf.fillColor('#64748b').text(k, 330, my, { width: 95 });

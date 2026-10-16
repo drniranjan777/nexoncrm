@@ -471,8 +471,8 @@ export async function quotationPdfDoc(tenantId: string, q: Awaited<ReturnType<ty
   const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
   const m = await pdfMoney(tenant, q, q.customer?.gstTreatment);
   return {
-    title: 'QUOTE', number: q.number, issueDate: q.issueDate, secondaryDate: { label: 'Expiry Date', value: q.validUntil },
-    meta: [['Reference#', q.referenceNumber], ['Salesperson', await memberName(q.salespersonId)], ['Project', q.project?.name], ...(m.exchange ? [m.exchange] : [])],
+    title: 'QUOTE', number: q.number, issueDate: q.issueDate,
+    meta: [['Reference#', q.referenceNumber], ['Project', q.project?.name], ...(m.exchange ? [m.exchange] : [])],
     subject: q.subject, seller: await sellerOf(tenant), buyer: buyerOf(q.customer, q.lead ?? undefined), shipTo: shipToOf(q.customer),
     placeOfSupply: q.placeOfSupply, isInterState: q.isInterState, supplyNote: m.supplyNote, currency: m.currency, items: q.items, totals: q, notes: q.notes, terms: q.terms,
     footer: tenantSettings(tenant.settings).documents.footer, watermark: q.status === 'DRAFT' ? 'DRAFT' : undefined,
@@ -847,8 +847,7 @@ export async function invoicePdfDoc(tenantId: string, inv: Awaited<ReturnType<ty
   const m = await pdfMoney(tenant, inv, inv.customer.gstTreatment);
   return {
     title: 'TAX INVOICE', number: inv.number ?? 'DRAFT', issueDate: inv.issueDate,
-    secondaryDate: { label: 'Due Date', value: inv.dueDate },
-    meta: [['Terms', PAYMENT_TERMS[inv.paymentTerms]?.label], ['Order Number', inv.orderNumber], ['Salesperson', await memberName(inv.salespersonId)], ['Project', inv.project ? `${inv.project.code} ${inv.project.name}` : null], ...(m.exchange ? [m.exchange] : [])],
+    meta: [['Order Number', inv.orderNumber], ['Project', inv.project ? `${inv.project.code} ${inv.project.name}` : null], ...(m.exchange ? [m.exchange] : [])],
     subject: inv.subject, seller: await sellerOf(tenant), buyer: buyerOf(inv.customer), shipTo: shipToOf(inv.customer),
     placeOfSupply: inv.placeOfSupply, isInterState: inv.isInterState, supplyNote: m.supplyNote, currency: m.currency, items: inv.items, totals: inv,
     notes: inv.notes, paymentInstructions: s.documents.bankDetails || null,

@@ -282,11 +282,10 @@ export async function proformaPdfDoc(tenantId: string, p: Proforma): Promise<Fin
   const override = (p.billTo ?? null) as z.infer<typeof billToSchema> | null;
   return {
     title: 'PROFORMA INVOICE', numberLabel: 'Proforma Invoice No.', number: p.number, issueDate: p.issueDate,
-    secondaryDate: { label: 'Valid Until', value: p.validUntil },
     meta: [
-      ['Payment Terms', PAYMENT_TERMS[p.paymentTerms]?.label], ['Client Ref / PO', p.referenceNumber],
+      ['Client Ref / PO', p.referenceNumber],
       ['Project / Service', p.serviceReference ?? (p.project ? `${p.project.code} ${p.project.name}` : null)],
-      ['Salesperson', await memberName(p.salespersonId)], ...(m.exchange ? [m.exchange] : []),
+      ...(m.exchange ? [m.exchange] : []),
     ],
     subject: p.subject, seller: await sellerOf(tenant), buyer: override ? { ...override, company: override.company ?? override.name } : buyerOf(p.customer), shipTo: shipToOf(p.customer),
     placeOfSupply: p.placeOfSupply, isInterState: p.isInterState, supplyNote: m.supplyNote, currency: m.currency, items: p.items, totals: p,
