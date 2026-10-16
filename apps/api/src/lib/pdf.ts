@@ -328,11 +328,15 @@ function draw(pdf: PDFKit.PDFDocument, doc: FinancialDoc) {
   const meta: [string, string][] = [[doc.numberLabel ?? 'Number', doc.number], ['Date', fmtDate(doc.issueDate)]];
   for (const [k, v] of doc.meta ?? []) if (v) meta.push([k, v]);
   if (doc.reference) meta.push(['Reference', doc.reference]);
+  // Values sit in a column sized to the widest one at the right edge, with each label right-aligned just before
+  // its value, so "Number" reads next to "INV-0001" instead of across a wide gap.
+  const valueW = Math.min(180, Math.max(...meta.map(([, v]) => pdf.widthOfString(v))) + 1);
+  const valueX = right - valueW;
   let my = 58;
   for (const [k, v] of meta) {
-    pdf.fillColor('#64748b').text(k, 330, my, { width: 95 });
-    pdf.fillColor('#0f172a').text(v, 425, my, { width: right - 425, align: 'right' });
-    my += 13;
+    pdf.fillColor('#64748b').text(k, valueX - 130, my, { width: 120, align: 'right' });
+    pdf.fillColor('#0f172a').text(v, valueX, my, { width: valueW });
+    my = Math.max(my + 13, pdf.y + 2);
   }
 
   // Parties
