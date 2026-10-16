@@ -20,6 +20,19 @@ type CustomerForm = Partial<Omit<Customer, 'id' | 'code' | 'createdAt' | '_count
 const SALUTATIONS = ['Mr.', 'Mrs.', 'Ms.', 'Miss', 'Dr.'];
 const REGISTERED = ['REGISTERED_REGULAR', 'REGISTERED_COMPOSITION', 'SEZ', 'DEEMED_EXPORT'];
 
+/**
+ * Label + field row of the customer form. Declared at module level: defined inside the form, it became a new
+ * component on every render, so React remounted its input after each keystroke and typing lost focus.
+ */
+function Row({ label, required, children, hint }: { label: ReactNode; required?: boolean; children: ReactNode; hint?: string }) {
+  return (
+    <div className="grid items-start gap-2 sm:grid-cols-[170px_1fr]">
+      <label className={cn('pt-2 text-sm', required ? 'text-red-600' : 'text-slate-700')}>{label}{required && '*'}</label>
+      <div>{children}{hint && <p className="mt-1 text-xs text-muted">{hint}</p>}</div>
+    </div>
+  );
+}
+
 export function CustomerFormDialog({ open, onOpenChange, customer, onSaved }: { open: boolean; onOpenChange: (v: boolean) => void; customer?: Customer & { contacts?: Contact[] }; onSaved?: (c: Customer) => void }) {
   const meta = useFinanceMeta();
   const [f, setF] = useState<CustomerForm>({});
@@ -65,12 +78,6 @@ export function CustomerFormDialog({ open, onOpenChange, customer, onSaved }: { 
     save.mutate(undefined, { onError: (e) => { if (e instanceof ApiError) setServerErrors(e.details?.fieldErrors ?? {}); } });
   };
   const registered = REGISTERED.includes(f.gstTreatment ?? '');
-  const Row = ({ label, required, children, hint }: { label: ReactNode; required?: boolean; children: ReactNode; hint?: string }) => (
-    <div className="grid items-start gap-2 sm:grid-cols-[170px_1fr]">
-      <label className={cn('pt-2 text-sm', required ? 'text-red-600' : 'text-slate-700')}>{label}{required && '*'}</label>
-      <div>{children}{hint && <p className="mt-1 text-xs text-muted">{hint}</p>}</div>
-    </div>
-  );
   const addr = (prefix: 'billing' | 'shipping') => {
     const k = (s: string) => (prefix === 'billing' ? ({ attention: 'billingAttention', address: 'billingAddress', city: 'city', state: 'state', postal: 'postalCode', country: 'country' } as Record<string, keyof CustomerForm>)[s] : ({ attention: 'shippingAttention', address: 'shippingAddress', city: 'shippingCity', state: 'shippingState', postal: 'shippingPostalCode', country: 'shippingCountry' } as Record<string, keyof CustomerForm>)[s]);
     const v = (s: string) => (f[k(s)] as string | null | undefined) ?? '';

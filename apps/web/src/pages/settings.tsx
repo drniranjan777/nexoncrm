@@ -306,6 +306,13 @@ export function DocumentSettings() {
   );
 }
 
+/** Labelled switch. At module level so toggling it does not remount it (which dropped keyboard focus). */
+function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-start justify-between gap-6 py-3"><span><span className="block text-sm font-medium">{label}</span>{hint && <span className="text-xs text-muted">{hint}</span>}</span><Switch checked={checked} onCheckedChange={onChange} /></label>
+  );
+}
+
 export function NotificationSettings() {
   const prefs = usePrefs();
   const saveN = useSaveSection('notifications');
@@ -314,9 +321,6 @@ export function NotificationSettings() {
   const [crm, setCrm] = useState<Preferences['crm'] | null>(null);
   useEffect(() => { if (prefs.data) { setN(prefs.data.notifications); setCrm(prefs.data.crm); } }, [prefs.data]);
   if (!n || !crm) return <Card><LoadingBlock /></Card>;
-  const Toggle = ({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) => (
-    <label className="flex items-start justify-between gap-6 py-3"><span><span className="block text-sm font-medium">{label}</span>{hint && <span className="text-xs text-muted">{hint}</span>}</span><Switch checked={checked} onCheckedChange={onChange} /></label>
-  );
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader title="Notifications & automation" />

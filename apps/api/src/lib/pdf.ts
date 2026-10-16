@@ -204,22 +204,26 @@ function partyLines(p: Party) {
 
 const PAGE_BOTTOM = 770; // keep clear of the footer line at 790
 
-/** "For <Company>", seal and signature side by side, then the signatory's name and designation. */
+const AUTH_WIDTH = 230;
+const authImageHeight = (a: AuthorizationBlock) => (a.seal || a.signature ? 90 : 30); // without images, leave a short space for a wet signature
+const authHeight = (a: AuthorizationBlock) => 16 + authImageHeight(a) + 46;
+
+/** "For <Company>", the signature stamped over the seal, then the signatory's name and designation. */
 function drawAuthorization(pdf: PDFKit.PDFDocument, a: AuthorizationBlock, y: number, right: number) {
-  const width = 230;
+  const width = AUTH_WIDTH;
   const x = right - width;
-  const imgH = a.seal || a.signature ? 78 : 30; // without images, leave a short space for a wet signature
-  const height = 16 + imgH + 46;
-  if (y + height > PAGE_BOTTOM) { pdf.addPage(); y = 50; }
+  const imgH = authImageHeight(a);
+  if (y + authHeight(a) > PAGE_BOTTOM) { pdf.addPage(); y = 50; }
   pdf.font(F.bold).fontSize(9).fillColor('#0f172a').text(`For ${a.company}`, x, y, { width, align: 'right' });
   const top = y + 16;
-  // Images keep their aspect ratio inside fixed boxes so they never overlap the text below.
-  let cursor = right;
-  if (a.signature) {
-    try { pdf.image(a.signature, cursor - 140, top, { fit: [140, imgH], align: 'right', valign: 'bottom' }); cursor -= 150; } catch { /* unreadable image: skipped */ }
-  }
+  // Seal and signature share one centre near the right edge; the signature is drawn last so it sits on top of the
+  // seal, as when a document is signed across its stamp. Both keep their aspect ratio inside fixed boxes.
+  const cx = right - 75;
   if (a.seal) {
-    try { pdf.image(a.seal, cursor - imgH, top, { fit: [imgH, imgH], align: 'center', valign: 'center' }); } catch { /* skipped */ }
+    try { pdf.image(a.seal, cx - imgH / 2, top, { fit: [imgH, imgH], align: 'center', valign: 'center' }); } catch { /* unreadable image: skipped */ }
+  }
+  if (a.signature) {
+    try { pdf.image(a.signature, cx - 75, top + 15, { fit: [150, imgH - 30], align: 'center', valign: 'center' }); } catch { /* skipped */ }
   }
   const lineY = top + imgH + 4;
   pdf.moveTo(x + 40, lineY).lineTo(right, lineY).strokeColor('#cbd5e1').lineWidth(0.7).stroke();
@@ -388,15 +392,28 @@ function draw(pdf: PDFKit.PDFDocument, doc: FinancialDoc) {
     pdf.fillColor('#92400e').text(doc.notice, left + 10, y + 6, { width: width - 20 });
     y += h + 14;
   }
+  // The signatory block sits to the right of the notes and terms, on the page where they start, whenever it fits
+  // there; the notes then wrap in the narrower left column. Otherwise it follows them as before.
+  const auth = doc.authorization;
+  const beside = auth && y + authHeight(auth) <= PAGE_BOTTOM ? { y, page: pdf.bufferedPageRange().count - 1 } : null;
+  const textW = beside ? width - AUTH_WIDTH - 20 : width;
   for (const [label, body] of [['NOTES', doc.notes], ['PAYMENT INSTRUCTIONS', doc.paymentInstructions], ['TERMS & CONDITIONS', doc.terms]] as const) {
     if (!body) continue;
     if (y > 730) { pdf.addPage(); y = 50; }
     pdf.font(F.bold).fontSize(8).fillColor('#64748b').text(label, left, y);
-    pdf.font(F.regular).fontSize(8.5).fillColor('#334155').text(body, left, y + 12, { width });
+    pdf.font(F.regular).fontSize(8.5).fillColor('#334155').text(body, left, y + 12, { width: textW });
     y = pdf.y + 14;
   }
 
-  if (doc.authorization) y = drawAuthorization(pdf, doc.authorization, y + 4, right);
+  if (auth && beside) {
+    const last = pdf.bufferedPageRange().count - 1;
+    pdf.switchToPage(pdf.bufferedPageRange().start + beside.page);
+    const end = drawAuthorization(pdf, auth, beside.y, right);
+    pdf.switchToPage(pdf.bufferedPageRange().start + last);
+    if (last === beside.page) y = Math.max(y, end);
+  } else if (auth) {
+    y = drawAuthorization(pdf, auth, y + 4, right);
+  }
 
   // Footer on every page
   const range = pdf.bufferedPageRange();
