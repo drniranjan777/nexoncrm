@@ -28,7 +28,7 @@ export function Dashboard() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        {membership && <span className="flex size-12 items-center justify-center overflow-hidden rounded-lg border border-line bg-white">{membership.tenant.logoFileId ? <img src={`/api/v1/public/tenants/${membership.tenant.slug}/logo?v=${membership.tenant.logoFileId}`} alt="" className="max-h-10 max-w-10 object-contain object-left" /> : <span className="text-lg font-bold" style={{ color: membership.tenant.brandColor }}>{membership.tenant.name[0]}</span>}</span>}
+        {membership && <span className="flex size-12 items-center justify-center overflow-hidden rounded-lg border border-line bg-surface">{membership.tenant.logoFileId ? <img src={`/api/v1/public/tenants/${membership.tenant.slug}/logo?v=${membership.tenant.logoFileId}`} alt="" className="max-h-10 max-w-10 object-contain object-left" /> : <span className="flex size-full items-center justify-center text-lg font-bold text-white" style={{ background: membership.tenant.brandColor || '#1e3a8a' }}>{membership.tenant.name[0]}</span>}</span>}
         <div><h1 className="text-[22px] font-semibold tracking-tight">Hello, {me?.name}</h1><p className="text-sm text-muted">{membership?.tenant.name}</p></div>
       </div>
       <Tabs defaultValue="dashboard">
@@ -119,10 +119,10 @@ function Overview() {
               {data.finance.collectionsTrend.length === 0 ? <EmptyState title="No payments recorded yet" /> : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data.finance.collectionsTrend.map((d) => ({ ...d, label: monthLabel(d.month) }))} margin={{ left: 8, right: 8 }}>
-                    <CartesianGrid vertical={false} stroke="#eef0f3" />
-                    <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} stroke="#64748b" />
-                    <YAxis tickLine={false} axisLine={false} fontSize={12} stroke="#64748b" tickFormatter={(v) => inrCompact(v)} width={64} />
-                    <Tooltip formatter={(v) => [inr(v), 'Collected']} cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: 8, borderColor: '#e6e8ec', fontSize: 13 }} />
+                    <CartesianGrid vertical={false} stroke="var(--color-line)" />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} stroke="var(--color-muted)" />
+                    <YAxis tickLine={false} axisLine={false} fontSize={12} stroke="var(--color-muted)" tickFormatter={(v) => inrCompact(v)} width={64} />
+                    <Tooltip formatter={(v) => [inr(v), 'Collected']} cursor={{ fill: 'var(--color-slate-100)' }} contentStyle={{ borderRadius: 8, borderColor: 'var(--color-line)', background: 'var(--color-surface)', color: 'var(--color-ink)', fontSize: 13 }} />
                     <Bar dataKey="value" fill="#1d42b8" radius={[4, 4, 0, 0]} maxBarSize={40} />
                   </BarChart>
                 </ResponsiveContainer>

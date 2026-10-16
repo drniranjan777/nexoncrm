@@ -3,7 +3,8 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Popover from '@radix-ui/react-popover';
-import { Bell, Building, Check, ChevronDown, ChevronsLeft, ChevronsRight, ChevronUp, LogOut, Menu, Plus, Search, Settings, ShieldCheck, User, X } from 'lucide-react';
+import { Bell, Building, Check, ChevronDown, ChevronsLeft, ChevronsRight, ChevronUp, LogOut, Menu, Monitor, Moon, Plus, Search, Settings, ShieldCheck, Sun, User, X } from 'lucide-react';
+import { setThemeChoice, useThemeChoice, type ThemeChoice } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { cn, timeAgo } from '@/lib/utils';
@@ -77,8 +78,8 @@ function SettingsMenu({ group, collapsed, onNavigate }: { group: NavGroup; colla
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content side="top" align="start" sideOffset={6} collisionPadding={8}
-            className="z-50 max-h-[min(32rem,calc(100vh-6rem))] w-60 overflow-y-auto rounded-xl border border-line bg-white p-1.5 shadow-lg">
-            <DropdownMenu.Label className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{group.label}</DropdownMenu.Label>
+            className="z-50 max-h-[min(32rem,calc(100vh-6rem))] w-60 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg">
+            <DropdownMenu.Label className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{group.label}</DropdownMenu.Label>
             {group.items.map((it) => {
               const on = isActivePath(pathname, it.to);
               return (
@@ -106,10 +107,10 @@ function Sidebar({ groups, collapsed, onToggle, mobileOpen, onClose, brand }: { 
   const { isOpen, toggle } = useOpenGroups(main.filter(foldable), pathname);
   return (
     <>
-      {mobileOpen && <div className="fixed inset-0 z-30 bg-slate-900/30 lg:hidden" onClick={onClose} />}
+      {mobileOpen && <div className="fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={onClose} />}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-line bg-white transition-[width,transform] duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-line bg-surface transition-[width,transform] duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0',
           collapsed ? 'lg:w-[68px]' : 'lg:w-64',
           mobileOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full',
         )}
@@ -117,7 +118,7 @@ function Sidebar({ groups, collapsed, onToggle, mobileOpen, onClose, brand }: { 
       >
         <div className={cn('flex h-14 shrink-0 items-center gap-2 border-b border-line px-4', collapsed && 'lg:justify-center lg:px-0')}>
           {brand}
-          <button className="ml-auto rounded-md p-1 text-slate-400 hover:bg-slate-100 lg:hidden" onClick={onClose} aria-label="Close menu"><X className="size-4" /></button>
+          <button className="ml-auto rounded-md p-1 text-slate-500 hover:bg-slate-100 lg:hidden" onClick={onClose} aria-label="Close menu"><X className="size-4" /></button>
         </div>
         <nav className="scrollbar-thin flex-1 overflow-y-auto px-3 py-3">
           {main.map((g) => {
@@ -125,7 +126,7 @@ function Sidebar({ groups, collapsed, onToggle, mobileOpen, onClose, brand }: { 
             if (!foldable(g)) {
               return (
                 <div key={g.label} className="mb-3">
-                  {main.length > 1 && g.label !== 'Overview' && <p className={cn('mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400', collapsed && 'lg:sr-only')}>{g.label}</p>}
+                  {main.length > 1 && g.label !== 'Overview' && <p className={cn('mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500', collapsed && 'lg:sr-only')}>{g.label}</p>}
                   <NavItems items={g.items} collapsed={collapsed} onNavigate={onClose} />
                 </div>
               );
@@ -134,7 +135,7 @@ function Sidebar({ groups, collapsed, onToggle, mobileOpen, onClose, brand }: { 
             return (
               <div key={g.label} className="mb-1">
                 <button type="button" onClick={() => toggle(g.label)} aria-expanded={open} aria-controls={id}
-                  className={cn('group flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 hover:bg-slate-50 hover:text-slate-600', collapsed && 'lg:hidden')}>
+                  className={cn('group flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 hover:bg-slate-50 hover:text-slate-600', collapsed && 'lg:hidden')}>
                   <span className="flex-1 text-left">{g.label}</span>
                   <ChevronDown className={cn('size-3.5 transition-transform', !open && '-rotate-90')} />
                 </button>
@@ -183,14 +184,14 @@ function GlobalSearch() {
             onChange={(e) => { setQ(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
             placeholder="Search customers, leads, invoices…"
-            className="h-9 w-full rounded-lg border border-line bg-slate-50 pl-9 pr-14 text-sm placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-3 focus:ring-brand-100"
+            className="h-9 w-full rounded-lg border border-line bg-slate-50 pl-9 pr-14 text-sm placeholder:text-slate-400 focus:border-brand-500 focus:bg-surface focus:outline-none focus:ring-3 focus:ring-brand-100"
             aria-label="Global search"
           />
-          <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-line bg-white px-1.5 text-[10px] text-muted sm:block">Ctrl K</kbd>
+          <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-line bg-surface px-1.5 text-[10px] text-muted sm:block">Ctrl K</kbd>
         </div>
       </Popover.Anchor>
       <Popover.Portal>
-        <Popover.Content align="start" sideOffset={6} onOpenAutoFocus={(e) => e.preventDefault()} className="z-50 w-[var(--radix-popover-trigger-width)] min-w-80 rounded-xl border border-line bg-white p-1.5 shadow-lg">
+        <Popover.Content align="start" sideOffset={6} onOpenAutoFocus={(e) => e.preventDefault()} className="z-50 w-[var(--radix-popover-trigger-width)] min-w-80 rounded-xl border border-line bg-surface p-1.5 shadow-lg">
           {isFetching && !data ? <div className="flex justify-center p-4"><Spinner /></div> : !data?.length ? <p className="p-4 text-center text-sm text-muted">No matches</p> : (
             <ul>
               {data.map((r) => (
@@ -228,7 +229,7 @@ function Notifications() {
         {!!data?.unread && <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-4 text-white">{data.unread > 9 ? '9+' : data.unread}</span>}
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content align="end" sideOffset={8} className="z-50 w-96 max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-white shadow-lg">
+        <Popover.Content align="end" sideOffset={8} className="z-50 w-96 max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-surface shadow-lg">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <p className="text-sm font-semibold">Notifications</p>
             {!!data?.unread && <button className="flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline" onClick={() => markRead.mutate(undefined)}><Check className="size-3" /> Mark all read</button>}
@@ -244,7 +245,7 @@ function Notifications() {
                     <span className="min-w-0">
                       <span className="block text-sm font-medium">{n.title}</span>
                       {n.body && <span className="block truncate text-xs text-muted">{n.body}</span>}
-                      <span className="mt-0.5 block text-[11px] text-slate-400">{timeAgo(n.createdAt)}</span>
+                      <span className="mt-0.5 block text-[11px] text-slate-500">{timeAgo(n.createdAt)}</span>
                     </span>
                   </button>
                 </Popover.Close>
@@ -281,12 +282,12 @@ function QuickCreate() {
   if (!groups.length) return null;
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger className="mr-1 flex size-8 items-center justify-center rounded-lg bg-brand-800 text-white hover:bg-brand-900" aria-label="Quick create"><Plus className="size-4" /></DropdownMenu.Trigger>
+      <DropdownMenu.Trigger className="mr-1 flex size-8 items-center justify-center rounded-lg bg-primary text-white hover:bg-primary-hover" aria-label="Quick create"><Plus className="size-4" /></DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align="end" sideOffset={8} className="z-50 grid w-[min(36rem,calc(100vw-2rem))] gap-4 rounded-xl border border-line bg-white p-4 shadow-lg sm:grid-cols-3">
+        <DropdownMenu.Content align="end" sideOffset={8} className="z-50 grid w-[min(36rem,calc(100vw-2rem))] gap-4 rounded-xl border border-line bg-surface p-4 shadow-lg sm:grid-cols-3">
           {groups.map((g) => (
             <div key={g.title}>
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{g.title}</p>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{g.title}</p>
               {g.items.map((i) => (
                 <DropdownMenu.Item key={i.label} onSelect={() => navigate(i.to)} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-slate-50"><Plus className="size-3.5 text-brand-600" />{i.label}</DropdownMenu.Item>
               ))}
@@ -295,6 +296,27 @@ function QuickCreate() {
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
+  );
+}
+
+const THEMES: [ThemeChoice, string, typeof Sun][] = [['light', 'Light', Sun], ['dark', 'Dark', Moon], ['system', 'System', Monitor]];
+
+/** Light / dark / follow-the-OS switch, shown in the account menu. */
+function ThemeSwitch() {
+  const choice = useThemeChoice();
+  return (
+    <div className="px-2.5 py-1.5">
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Theme</p>
+      <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
+        {THEMES.map(([value, label, Icon]) => (
+          <button key={value} type="button" role="radio" aria-checked={choice === value} onClick={() => setThemeChoice(value)}
+            className={cn('flex items-center justify-center gap-1.5 rounded-md py-1 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-brand-300',
+              choice === value ? 'bg-surface text-ink shadow-xs' : 'text-slate-500 hover:text-ink')}>
+            <Icon className="size-3.5" />{label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -313,7 +335,7 @@ function UserMenu({ platform }: { platform?: boolean }) {
         <ChevronDown className="size-3.5 text-slate-400" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align="end" sideOffset={6} className="z-50 w-64 rounded-xl border border-line bg-white p-1.5 shadow-lg">
+        <DropdownMenu.Content align="end" sideOffset={6} className="z-50 w-64 rounded-xl border border-line bg-surface p-1.5 shadow-lg">
           <div className="px-2.5 py-2">
             <p className="truncate text-sm font-medium">{me.name}</p>
             <p className="truncate text-xs text-muted">{me.email}</p>
@@ -321,7 +343,7 @@ function UserMenu({ platform }: { platform?: boolean }) {
           {me.memberships.length > 0 && (
             <>
               <DropdownMenu.Separator className="my-1 h-px bg-line" />
-              <DropdownMenu.Label className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Workspaces</DropdownMenu.Label>
+              <DropdownMenu.Label className="px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Workspaces</DropdownMenu.Label>
               {me.memberships.map((m) => (
                 <DropdownMenu.Item key={m.tenant.id} onSelect={() => { switchTenant(m.tenant.id); navigate(m.role.key === 'customer' ? '/portal' : '/'); }}
                   className="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none data-[highlighted]:bg-slate-50">
@@ -344,7 +366,10 @@ function UserMenu({ platform }: { platform?: boolean }) {
           <DropdownMenu.Item onSelect={() => navigate('/account')} className="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none data-[highlighted]:bg-slate-50">
             <User className="size-4 text-slate-500" /> Account & security
           </DropdownMenu.Item>
-          <DropdownMenu.Item onSelect={async () => { await logout(); navigate('/login'); }} className="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-red-600 outline-none data-[highlighted]:bg-red-50">
+          <DropdownMenu.Separator className="my-1 h-px bg-line" />
+          <ThemeSwitch />
+          <DropdownMenu.Separator className="my-1 h-px bg-line" />
+          <DropdownMenu.Item onSelect={async () => { await logout(); navigate('/login'); }} className="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-red-600 outline-none data-[highlighted]:bg-red-50 data-[highlighted]:text-red-700">
             <LogOut className="size-4" /> Sign out
           </DropdownMenu.Item>
         </DropdownMenu.Content>
@@ -372,7 +397,7 @@ export function AppShell({ mode = 'tenant' }: { mode?: 'tenant' | 'portal' | 'pl
         <>
           <NexonwebLogo className={cn('h-11', collapsed && 'lg:hidden')} />
           {collapsed && <NexonwebMark className="hidden lg:block" />}
-          {mode === 'platform' && <span className={cn('rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white', collapsed && 'lg:hidden')}>Admin</span>}
+          {mode === 'platform' && <span className={cn('rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white', collapsed && 'lg:hidden')}>Admin</span>}
         </>
       ) : tenant.logoFileId ? (
         <>
@@ -399,7 +424,7 @@ export function AppShell({ mode = 'tenant' }: { mode?: 'tenant' | 'portal' | 'pl
             Your trial ends in {Math.max(0, trialEnds)} day{trialEnds === 1 ? '' : 's'}. {can('subscription.manage') && <Link to="/settings/subscription" className="font-medium underline">Choose a plan</Link>}
           </div>
         )}
-        <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-white/90 px-4 backdrop-blur lg:px-6">
+        <header className="no-print sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur lg:px-6">
           <button className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu className="size-5" /></button>
           {mode === 'tenant' ? <GlobalSearch /> : <div className="flex-1" />}
           <div className="ml-auto flex items-center gap-1">

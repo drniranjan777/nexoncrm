@@ -79,7 +79,7 @@ export function TasksPage() {
     <>
       <PageHeader title="Tasks" description="Project work, follow-ups and feedback actions."
         actions={<>
-          <div className="flex rounded-lg border border-line bg-white p-0.5">
+          <div className="flex rounded-lg border border-line bg-surface p-0.5">
             <button className={cn('rounded-md px-2 py-1', view === 'list' && 'bg-slate-100')} onClick={() => setView('list')} aria-label="List view"><List className="size-4" /></button>
             <button className={cn('rounded-md px-2 py-1', view === 'board' && 'bg-slate-100')} onClick={() => { setView('board'); list.setFilter('status', ''); }} aria-label="Board view"><LayoutGrid className="size-4" /></button>
           </div>
@@ -120,10 +120,10 @@ export function TasksPage() {
               <div className="px-3 py-2.5"><StatusBadge status={s} /></div>
               <div className="flex min-h-24 flex-col gap-2 px-2 pb-2">
                 {list.data?.items.filter((t) => t.status === s).map((t) => (
-                  <div key={t.id} draggable onDragStart={() => setDrag(t.id)} onClick={() => setSelected(t)} className="cursor-pointer rounded-lg border border-line bg-white p-3 shadow-xs hover:border-brand-300">
+                  <div key={t.id} draggable onDragStart={() => setDrag(t.id)} onClick={() => setSelected(t)} className="cursor-pointer rounded-lg border border-line bg-surface p-3 shadow-xs hover:border-brand-300">
                     <p className="text-sm font-medium">{t.title}</p>
                     <div className="mt-2 flex items-center justify-between text-xs text-muted"><StatusBadge status={t.priority} /><span>{fmtDate(t.dueDate, { day: '2-digit', month: 'short' })}</span></div>
-                    <p className="mt-1 truncate text-[11px] text-slate-400">{memberName(members.data, t.assigneeId)}{t.project && ` · ${t.project.code}`}</p>
+                    <p className="mt-1 truncate text-[11px] text-slate-500">{memberName(members.data, t.assigneeId)}{t.project && ` · ${t.project.code}`}</p>
                   </div>
                 ))}
               </div>

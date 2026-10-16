@@ -15,10 +15,10 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-brand-800 text-white shadow-sm hover:bg-brand-900',
-        secondary: 'border border-line bg-white text-ink shadow-xs hover:bg-slate-50',
+        primary: 'bg-primary text-white shadow-sm hover:bg-primary-hover',
+        secondary: 'border border-line bg-surface text-ink shadow-xs hover:bg-slate-50',
         ghost: 'text-slate-600 hover:bg-slate-100 hover:text-ink',
-        danger: 'bg-red-600 text-white shadow-sm hover:bg-red-700',
+        danger: 'bg-danger text-white shadow-sm hover:bg-danger-hover',
         link: 'text-brand-700 underline-offset-4 hover:underline px-0',
       },
       size: { sm: 'h-8 px-3 text-[13px]', md: 'h-9 px-4', lg: 'h-11 px-5 text-[15px]', icon: 'size-9' },
@@ -45,7 +45,7 @@ Button.displayName = 'Button';
 // ───────────── Form controls ─────────────
 
 const control =
-  'w-full rounded-lg border border-line bg-white px-3 text-sm text-ink placeholder:text-slate-400 shadow-xs transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-100 disabled:bg-slate-50 disabled:text-slate-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:ring-red-50';
+  'w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink placeholder:text-slate-400 shadow-xs transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-100 disabled:bg-slate-50 disabled:text-slate-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:ring-red-50';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(({ className, ...p }, ref) => (
   <input ref={ref} className={cn(control, 'h-9', className)} {...p} />
@@ -75,7 +75,7 @@ export function Label({ className, ...p }: HTMLAttributes<HTMLLabelElement> & { 
 export function Field({ label, error, hint, children, className, required, htmlFor }: { label?: ReactNode; error?: string; hint?: ReactNode; children: ReactNode; className?: string; required?: boolean; htmlFor?: string }) {
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      {label && <Label htmlFor={htmlFor}>{label}{required && <span className="ml-0.5 text-red-500">*</span>}</Label>}
+      {label && <Label htmlFor={htmlFor}>{label}{required && <span className="ml-0.5 text-red-600">*</span>}</Label>}
       {children}
       {error ? <p className="text-xs text-red-600" role="alert">{error}</p> : hint ? <p className="text-xs text-muted">{hint}</p> : null}
     </div>
@@ -94,7 +94,7 @@ export function SearchInput({ value, onChange, placeholder = 'Search…', classN
 export function Switch({ checked, onCheckedChange, id, disabled }: { checked: boolean; onCheckedChange: (v: boolean) => void; id?: string; disabled?: boolean }) {
   return (
     <SwitchPrimitive.Root id={id} checked={checked} onCheckedChange={onCheckedChange} disabled={disabled}
-      className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-slate-200 transition-colors data-[state=checked]:bg-brand-700 disabled:opacity-50">
+      className="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full bg-slate-200 transition-colors data-[state=checked]:bg-primary disabled:opacity-50">
       <SwitchPrimitive.Thumb className="block size-4 translate-x-0.5 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-[18px]" />
     </SwitchPrimitive.Root>
   );
@@ -103,7 +103,7 @@ export function Switch({ checked, onCheckedChange, id, disabled }: { checked: bo
 export function Checkbox({ checked, onCheckedChange, id, 'aria-label': ariaLabel }: { checked: boolean; onCheckedChange: (v: boolean) => void; id?: string; 'aria-label'?: string }) {
   return (
     <CheckboxPrimitive.Root id={id} aria-label={ariaLabel} checked={checked} onCheckedChange={(v) => onCheckedChange(v === true)}
-      className="flex size-4 shrink-0 items-center justify-center rounded border border-slate-300 bg-white data-[state=checked]:border-brand-700 data-[state=checked]:bg-brand-700">
+      className="flex size-4 shrink-0 items-center justify-center rounded border border-slate-300 bg-surface data-[state=checked]:border-primary data-[state=checked]:bg-primary">
       <CheckboxPrimitive.Indicator><Check className="size-3 text-white" strokeWidth={3} /></CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   );
@@ -112,7 +112,7 @@ export function Checkbox({ checked, onCheckedChange, id, 'aria-label': ariaLabel
 // ───────────── Surfaces ─────────────
 
 export function Card({ className, ...p }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-xl border border-line bg-white shadow-xs', className)} {...p} />;
+  return <div className={cn('rounded-xl border border-line bg-surface shadow-xs', className)} {...p} />;
 }
 
 export function CardHeader({ title, description, actions, className }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; className?: string }) {
@@ -147,7 +147,7 @@ export function Stat({ label, value, hint, icon, tone = 'default' }: { label: st
         <p className="text-[13px] font-medium text-muted">{label}</p>
         {icon && <span className="text-slate-400 [&_svg]:size-4">{icon}</span>}
       </div>
-      <p className={cn('mt-2 text-2xl font-semibold tracking-tight tabular-nums', tone === 'bad' && 'text-red-600', tone === 'good' && 'text-emerald-600', tone === 'warn' && 'text-amber-600')}>{value}</p>
+      <p className={cn('mt-2 text-2xl font-semibold tracking-tight tabular-nums', tone === 'bad' && 'text-red-600', tone === 'good' && 'text-emerald-700', tone === 'warn' && 'text-amber-700')}>{value}</p>
       {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
     </Card>
   );
@@ -191,8 +191,8 @@ export function Stars({ value, className }: { value?: number | null; className?:
   if (!value) return <span className="text-muted">—</span>;
   return (
     <span className={cn('inline-flex items-center gap-0.5 text-sm tabular-nums', className)} aria-label={`${value} out of 5`}>
-      <span className={cn('font-semibold', value <= 2 ? 'text-red-600' : value === 3 ? 'text-amber-600' : 'text-emerald-600')}>{Number(value).toFixed(Number.isInteger(value) ? 0 : 1)}</span>
-      <span className="text-slate-400">/5</span>
+      <span className={cn('font-semibold', value <= 2 ? 'text-red-600' : value === 3 ? 'text-amber-700' : 'text-emerald-700')}>{Number(value).toFixed(Number.isInteger(value) ? 0 : 1)}</span>
+      <span className="text-slate-500">/5</span>
     </span>
   );
 }
@@ -265,7 +265,7 @@ export function Pagination({ page, pages, total, onPage, pageSize, onPageSize, s
         <span>{total.toLocaleString('en-IN')} result{total === 1 ? '' : 's'}</span>
         {onPageSize && pageSize && (
           <label className="flex items-center gap-2">Rows per page
-            <select className="h-8 rounded-md border border-line bg-white px-2 text-[13px] text-ink" value={pageSize} onChange={(e) => onPageSize(Number(e.target.value))} aria-label="Rows per page">
+            <select className="h-8 rounded-md border border-line bg-surface px-2 text-[13px] text-ink" value={pageSize} onChange={(e) => onPageSize(Number(e.target.value))} aria-label="Rows per page">
               {sizes.map((s) => <option key={s} value={s}>{s}</option>)}
               {allSize && <option value={allSize}>All</option>}
             </select>
@@ -288,14 +288,14 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[2px] data-[state=open]:animate-in" />
-        <DialogPrimitive.Content className={cn('fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-line bg-white shadow-xl focus:outline-none', width)}>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] data-[state=open]:animate-in" />
+        <DialogPrimitive.Content className={cn('fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-line bg-surface shadow-xl focus:outline-none', width)}>
           <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
             <div>
               <DialogPrimitive.Title className="text-base font-semibold text-ink">{title}</DialogPrimitive.Title>
               {description ? <DialogPrimitive.Description className="mt-0.5 text-[13px] text-muted">{description}</DialogPrimitive.Description> : <DialogPrimitive.Description className="sr-only">{String(title)}</DialogPrimitive.Description>}
             </div>
-            <DialogPrimitive.Close className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-ink" aria-label="Close"><X className="size-4" /></DialogPrimitive.Close>
+            <DialogPrimitive.Close className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-ink" aria-label="Close"><X className="size-4" /></DialogPrimitive.Close>
           </div>
           <div className="scrollbar-thin overflow-y-auto px-5 py-4">{children}</div>
           {footer && <div className="flex justify-end gap-2 border-t border-line bg-slate-50/60 px-5 py-3">{footer}</div>}
@@ -309,12 +309,12 @@ export function Sheet({ open, onOpenChange, title, children, footer }: { open: b
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-slate-900/30" />
-        <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col border-l border-line bg-white shadow-2xl focus:outline-none">
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/30" />
+        <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col border-l border-line bg-surface shadow-2xl focus:outline-none">
           <div className="flex items-center justify-between border-b border-line px-5 py-4">
             <DialogPrimitive.Title className="text-base font-semibold">{title}</DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">{String(title)}</DialogPrimitive.Description>
-            <DialogPrimitive.Close className="rounded-md p-1 text-slate-400 hover:bg-slate-100" aria-label="Close"><X className="size-4" /></DialogPrimitive.Close>
+            <DialogPrimitive.Close className="rounded-md p-1 text-slate-500 hover:bg-slate-100" aria-label="Close"><X className="size-4" /></DialogPrimitive.Close>
           </div>
           <div className="scrollbar-thin flex-1 overflow-y-auto px-5 py-4">{children}</div>
           {footer && <div className="flex justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}

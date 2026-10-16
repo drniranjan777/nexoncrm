@@ -253,7 +253,7 @@ export function KnowledgeBase() {
                 <div className="flex items-center gap-2">{a.category && <Badge>{a.category.name}</Badge>}{!a.published && <Badge tone="amber">Draft</Badge>}</div>
                 <p className="mt-2 font-semibold">{a.title}</p>
                 <p className="mt-1 line-clamp-3 text-sm text-muted">{a.excerpt}</p>
-                <p className="mt-3 text-xs text-slate-400">Updated {fmtDate(a.updatedAt)}</p>
+                <p className="mt-3 text-xs text-slate-500">Updated {fmtDate(a.updatedAt)}</p>
               </Card>
             </Link>
           ))}

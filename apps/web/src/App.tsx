@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './lib/auth';
 import { AppShell } from './components/AppShell';
+import { ForceLightTheme } from './lib/theme';
 import { EmptyState, Spinner } from './components/ui';
 
 // Lazy-load a named page export so each module becomes its own chunk.
@@ -170,9 +171,9 @@ export default function App() {
     return (
       <Suspense fallback={<FullPageSpinner />}>
         <Routes>
-          <Route path="/" element={<PublicFeedbackForm />} />
-          <Route path="/f/:token" element={<PublicFeedbackForm />} />
-          <Route path="/track" element={<TrackFeedback />} />
+          <Route path="/" element={<><ForceLightTheme /><PublicFeedbackForm /></>} />
+          <Route path="/f/:token" element={<><ForceLightTheme /><PublicFeedbackForm /></>} />
+          <Route path="/track" element={<><ForceLightTheme /><TrackFeedback /></>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
@@ -186,9 +187,9 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
-        <Route path="/submit-feedback" element={<PublicFeedbackForm />} />
-        <Route path="/f/:token" element={<PublicFeedbackForm />} />
-        <Route path="/track" element={<TrackFeedback />} />
+        <Route path="/submit-feedback" element={<><ForceLightTheme /><PublicFeedbackForm /></>} />
+        <Route path="/f/:token" element={<><ForceLightTheme /><PublicFeedbackForm /></>} />
+        <Route path="/track" element={<><ForceLightTheme /><TrackFeedback /></>} />
 
         <Route path="/platform" element={<RequireAuth><PlatformGate /></RequireAuth>}>
           <Route index element={<PlatformOverview />} />

@@ -41,7 +41,7 @@ export function PaymentsPage() {
                   <TD>{fmtDate(p.paidAt)}</TD><TD className="font-medium text-brand-700">{p.number}</TD><TD className="text-slate-600">{p.reference ?? ''}</TD>
                   <TD>{p.customer?.name}</TD><TD className="text-slate-600">{p.invoiceNumbers?.join(', ')}</TD><TD>{titleCase(p.method)}</TD>
                   <TD className="text-right tabular-nums">{money(p.amount, p.currency)}</TD><TD className="text-right tabular-nums">{money(p.unusedAmount, p.currency)}</TD>
-                  <TD><span className={cn('text-xs font-semibold', num(p.unusedAmount) > 0 ? 'text-amber-600' : 'text-emerald-600')}>{num(p.unusedAmount) > 0 ? 'UNUSED CREDIT' : 'PAID'}</span></TD>
+                  <TD><span className={cn('text-xs font-semibold', num(p.unusedAmount) > 0 ? 'text-amber-700' : 'text-emerald-700')}>{num(p.unusedAmount) > 0 ? 'UNUSED CREDIT' : 'PAID'}</span></TD>
                 </TR>
               ))}
             </TBody></Table>
@@ -174,7 +174,7 @@ export function PaymentForm() {
           <div className="w-80 space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-slate-600">Amount received</span><span className="tabular-nums">{money(received, cur)}</span></div>
             <div className="flex justify-between"><span className="text-slate-600">Amount used for payments</span><span className="tabular-nums">{money(applied, cur)}</span></div>
-            <div className={cn('flex justify-between font-semibold', excess < 0 ? 'text-red-600' : excess > 0 && 'text-amber-600')}><span>Amount in excess</span><span className="tabular-nums">{money(excess, cur)}</span></div>
+            <div className={cn('flex justify-between font-semibold', excess < 0 ? 'text-red-600' : excess > 0 && 'text-amber-700')}><span>Amount in excess</span><span className="tabular-nums">{money(excess, cur)}</span></div>
             {excess > 0 && <p className="text-xs text-muted">The excess is kept as unused credit for this customer.</p>}
           </div>
         </div>

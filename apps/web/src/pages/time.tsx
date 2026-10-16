@@ -68,7 +68,7 @@ export function TimeTrackingPage() {
               {list.data.items.map((e) => (
                 <TR key={e.id} onClick={() => !e.invoiceId && !e.timerStartedAt && setLog({ id: e.id, projectId: e.projectId, date: toDateInput(e.date), hours: String(Math.floor(e.minutes / 60)), minutes: String(e.minutes % 60), notes: e.notes ?? '', billable: e.billable })}>
                   <TD>{fmtDate(e.date)}</TD><TD className="font-medium">{e.project?.name}</TD><TD className="text-slate-600">{memberName(members.data, e.userId)}</TD><TD className="max-w-xs truncate text-slate-600">{e.notes}</TD>
-                  <TD>{e.timerStartedAt ? <Badge tone="blue">Running</Badge> : e.invoice ? <span className="text-xs font-semibold text-emerald-600">INVOICED {e.invoice.number}</span> : e.billable ? <span className="text-xs font-semibold text-amber-600">UNBILLED</span> : <span className="text-xs text-muted">NON-BILLABLE</span>}</TD>
+                  <TD>{e.timerStartedAt ? <Badge tone="blue">Running</Badge> : e.invoice ? <span className="text-xs font-semibold text-emerald-700">INVOICED {e.invoice.number}</span> : e.billable ? <span className="text-xs font-semibold text-amber-700">UNBILLED</span> : <span className="text-xs text-muted">NON-BILLABLE</span>}</TD>
                   <TD className="text-right font-mono tabular-nums">{hm(e.minutes)}</TD>
                 </TR>
               ))}
@@ -119,7 +119,7 @@ export function InvoiceUnbilledDialog({ open, onOpenChange, onCreated, customerI
       {customerId && (data.isLoading ? <LoadingBlock rows={3} /> : !data.data?.time.length && !data.data?.expenses.length ? <EmptyState title="Nothing unbilled for this customer" /> : (
         <div className="mt-4 space-y-4">
           {!!data.data?.time.length && <div><p className="mb-2 text-sm font-semibold">Time entries</p><ul className="divide-y divide-line rounded-lg border border-line">{data.data.time.map((t) => (
-            <li key={t.id} className="flex items-center gap-3 px-3 py-2 text-sm"><Checkbox checked={!!sel[t.id]} onCheckedChange={(v) => setSel({ ...sel, [t.id]: v })} /><span className="flex-1">{fmtDate(t.date)} · {t.project.name}{t.notes ? ` · ${t.notes}` : ''}</span><span className="font-mono">{hm(t.minutes)}</span><span className="w-24 text-right tabular-nums">{t.project.hourlyRate ? inr((t.minutes / 60) * num(t.project.hourlyRate)) : <span className="text-xs text-amber-600">no rate</span>}</span></li>
+            <li key={t.id} className="flex items-center gap-3 px-3 py-2 text-sm"><Checkbox checked={!!sel[t.id]} onCheckedChange={(v) => setSel({ ...sel, [t.id]: v })} /><span className="flex-1">{fmtDate(t.date)} · {t.project.name}{t.notes ? ` · ${t.notes}` : ''}</span><span className="font-mono">{hm(t.minutes)}</span><span className="w-24 text-right tabular-nums">{t.project.hourlyRate ? inr((t.minutes / 60) * num(t.project.hourlyRate)) : <span className="text-xs text-amber-700">no rate</span>}</span></li>
           ))}</ul></div>}
           {!!data.data?.expenses.length && <div><p className="mb-2 text-sm font-semibold">Billable expenses</p><ul className="divide-y divide-line rounded-lg border border-line">{data.data.expenses.map((e) => (
             <li key={e.id} className="flex items-center gap-3 px-3 py-2 text-sm"><Checkbox checked={!!sel[e.id]} onCheckedChange={(v) => setSel({ ...sel, [e.id]: v })} /><span className="flex-1">{fmtDate(e.date)} · {e.category?.name}{e.vendor ? ` · ${e.vendor}` : ''}</span><span className="w-24 text-right tabular-nums">{inr(num(e.amount) * (1 + num(e.markupPct) / 100))}</span></li>

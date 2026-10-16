@@ -12,11 +12,13 @@ import { useAction } from '@/lib/hooks';
 import { fmtDateTime } from '@/lib/utils';
 import { AuthFormBackdrop, AuthShowcase, PRODUCT_NAME, TallygenLogo } from '@/components/authBrand';
 import { cn } from '@/lib/utils';
+import { ForceLightTheme } from '@/lib/theme';
 import { Button, Card, CardHeader, EmptyState, ErrorState, Field, Input, LoadingBlock, PageHeader, Badge } from '@/components/ui';
 
 function AuthLayout({ title, subtitle, children, footer }: { title: string; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode }) {
   return (
-    <div className="grid min-h-full bg-white lg:grid-cols-[minmax(0,1.42fr)_minmax(0,1fr)]">
+    <div className="grid min-h-full bg-surface lg:grid-cols-[minmax(0,1.42fr)_minmax(0,1fr)]">
+      <ForceLightTheme />
       <AuthShowcase />
       <AuthFormBackdrop>
         <main className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-12 lg:px-14 xl:px-20">
@@ -37,12 +39,12 @@ function AuthLayout({ title, subtitle, children, footer }: { title: string; subt
 
 /** "OR" separator between the form and the alternative action. */
 const OrDivider = () => (
-  <div className="my-7 flex items-center gap-4 text-sm font-medium text-slate-400" role="separator" aria-label="or">
+  <div className="my-7 flex items-center gap-4 text-sm font-medium text-slate-500" role="separator" aria-label="or">
     <span className="h-px flex-1 bg-slate-200" />OR<span className="h-px flex-1 bg-slate-200" />
   </div>
 );
 
-const authInput = 'h-12 w-full rounded-xl border border-slate-200 bg-white text-[15px] text-ink shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 disabled:text-slate-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-100';
+const authInput = 'h-12 w-full rounded-xl border border-slate-200 bg-surface text-[15px] text-ink shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-100 disabled:bg-slate-50 disabled:text-slate-500 aria-[invalid=true]:border-red-400 aria-[invalid=true]:focus:ring-red-100';
 
 /** Labelled input with an optional leading icon and an error linked for screen readers. */
 const AuthField = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { id: string; label: ReactNode; icon?: typeof Mail; error?: string; hint?: ReactNode; labelAside?: ReactNode; trailing?: ReactNode }>(

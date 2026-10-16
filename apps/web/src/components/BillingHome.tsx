@@ -4,7 +4,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { Plus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { inr, inrCompact } from '@/lib/utils';
+import { cn, inr, inrCompact } from '@/lib/utils';
 import { Card, CardHeader, EmptyState, ErrorState, LoadingBlock, Table, TBody, TD, TH, THead } from './ui';
 
 interface BillingHomeData {
@@ -45,7 +45,7 @@ export function BillingHome() {
           <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-5">
             {BUCKETS.map((b, i) => (
               <div key={b.key} className={i === 1 ? 'sm:border-l sm:border-line sm:pl-4' : ''}>
-                <p className="h-4 text-[11px] font-semibold uppercase tracking-wide" style={{ color: i === 0 ? '#3b6ef5' : '#ea580c' }}>{b.label}</p>
+                <p className={cn('h-4 text-[11px] font-semibold uppercase tracking-wide', i === 0 ? 'text-brand-600' : 'text-orange-700')}>{b.label}</p>
                 <p className="mt-1 text-lg font-semibold tabular-nums">{inr(d.receivables[b.key])}</p>
                 <p className="text-xs text-muted">{b.sub}</p>
               </div>
@@ -60,11 +60,11 @@ export function BillingHome() {
           <div className="h-72 p-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={d.monthly} margin={{ left: 4, right: 8 }}>
-                <CartesianGrid vertical={false} stroke="#eef0f3" />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} stroke="#64748b" interval={1} />
-                <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="#64748b" tickFormatter={(v) => inrCompact(v)} width={60} />
-                <Tooltip formatter={(v) => inr(v)} cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: 8, borderColor: '#e6e8ec', fontSize: 13 }} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                <CartesianGrid vertical={false} stroke="var(--color-line)" />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted)" interval={1} />
+                <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted)" tickFormatter={(v) => inrCompact(v)} width={60} />
+                <Tooltip formatter={(v) => inr(v)} cursor={{ fill: 'var(--color-slate-100)' }} contentStyle={{ borderRadius: 8, borderColor: 'var(--color-line)', background: 'var(--color-surface)', color: 'var(--color-ink)', fontSize: 13 }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} formatter={(v) => <span className="text-slate-600">{v}</span>} />
                 <Bar dataKey="sales" name="Sales" fill="#3b6ef5" radius={[3, 3, 0, 0]} maxBarSize={14} />
                 <Bar dataKey="receipts" name="Receipts" fill="#22c55e" radius={[3, 3, 0, 0]} maxBarSize={14} />
                 <Bar dataKey="expenses" name="Expenses" fill="#ef4444" radius={[3, 3, 0, 0]} maxBarSize={14} />
@@ -73,7 +73,7 @@ export function BillingHome() {
           </div>
           <div className="flex flex-col justify-center gap-5 border-t border-line p-5 text-right lg:border-l lg:border-t-0">
             <div><p className="text-xs text-brand-600">Total Sales</p><p className="text-xl font-semibold tabular-nums">{inr(d.totals.sales)}</p></div>
-            <div><p className="text-xs text-emerald-600">Total Receipts</p><p className="text-xl font-semibold tabular-nums">{inr(d.totals.receipts)}</p></div>
+            <div><p className="text-xs text-emerald-700">Total Receipts</p><p className="text-xl font-semibold tabular-nums">{inr(d.totals.receipts)}</p></div>
             <div><p className="text-xs text-red-600">Total Expenses</p><p className="text-xl font-semibold tabular-nums">{inr(d.totals.expenses)}</p></div>
           </div>
         </div>

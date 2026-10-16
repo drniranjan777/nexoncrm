@@ -65,7 +65,7 @@ function ItemPicker({ value, products, onPick, onText }: { value: string; produc
       <Textarea rows={2} className="min-h-14 resize-y" value={value} placeholder="Type or click to select an item."
         onFocus={() => setOpen(true)} onChange={(e) => { onText(e.target.value); setOpen(true); }} />
       {open && matches.length > 0 && (
-        <ul className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-line bg-white py-1 shadow-lg">
+        <ul className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-line bg-surface py-1 shadow-lg">
           {matches.map((p) => (
             <li key={p.id}>
               <button type="button" className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-slate-50" onMouseDown={(e) => { e.preventDefault(); onPick(p); setOpen(false); }}>
@@ -148,7 +148,7 @@ function CodeTag({ kind, code, products, onKind, onCode }: { kind: ItemKind; cod
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
       <button type="button" onClick={() => onKind(kind === 'GOODS' ? 'SERVICE' : 'GOODS')} title="Switch between goods and service"
-        className={cn('rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white', kind === 'GOODS' ? 'bg-sky-600' : 'bg-emerald-600')}>
+        className={cn('rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white', kind === 'GOODS' ? 'bg-[#0284c7]' : 'bg-[#059669]')}>
         {kind}
       </button>
       <span className="text-slate-600">{label}:</span>
@@ -158,7 +158,7 @@ function CodeTag({ kind, code, products, onKind, onCode }: { kind: ItemKind; cod
       </button>
       {open && createPortal(
         <div ref={panel} role="dialog" aria-label={`${label} code`} style={{ top: pos.top, left: pos.left }}
-          className="fixed z-50 w-[26rem] max-w-[calc(100vw-1rem)] rounded-xl border border-line bg-white p-4 shadow-xl">
+          className="fixed z-50 w-[26rem] max-w-[calc(100vw-1rem)] rounded-xl border border-line bg-surface p-4 shadow-xl">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-sm font-semibold">{label} code</p>
             {code && <button type="button" className="text-xs text-slate-500 hover:text-red-600" onClick={() => pick('')}>Clear</button>}
@@ -497,7 +497,7 @@ export function DocEditor({ kind }: { kind: DocKind }) {
             </label>
             <p className="mt-1 text-xs text-muted">Only this proforma invoice changes. The customer record stays as it is.</p>
             {h.billToOn && (
-              <div className="mt-3 grid gap-3 rounded-lg border border-line bg-white p-4 sm:grid-cols-2">
+              <div className="mt-3 grid gap-3 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2">
                 {([['name', 'Contact name*'], ['company', 'Company'], ['address', 'Address'], ['city', 'City'], ['state', 'State'], ['postalCode', 'Postal code'], ['gstin', 'GSTIN'], ['email', 'Email'], ['phone', 'Phone']] as [keyof BillTo, string][]).map(([k, label]) => (
                   <Field key={k} label={label} className={k === 'address' ? 'sm:col-span-2' : undefined}>
                     {k === 'address'
@@ -725,7 +725,7 @@ export function DocEditor({ kind }: { kind: DocKind }) {
         </div>
       </Card>
 
-      <div className="sticky bottom-0 z-20 -mx-4 border-t border-line bg-white/95 backdrop-blur lg:-mx-8">
+      <div className="sticky bottom-0 z-20 -mx-4 border-t border-line bg-surface/95 backdrop-blur lg:-mx-8">
         <div className="flex flex-wrap items-center gap-2 px-4 py-3 lg:px-8">
           {kind === 'recurring' || sentDoc ? (
             <>

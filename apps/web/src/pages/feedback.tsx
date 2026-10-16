@@ -33,7 +33,7 @@ export function FeedbackList() {
         </>} />
       <div className="scrollbar-thin mb-4 flex gap-2 overflow-x-auto">
         {[['', 'All'], ...STATUSES.map((s) => [s, titleCase(s)])].map(([s, label]) => (
-          <button key={s} onClick={() => list.setFilter('status', s)} className={cn('whitespace-nowrap rounded-full border px-3 py-1 text-[13px] font-medium', list.filters.status === s ? 'border-brand-700 bg-brand-800 text-white' : 'border-line bg-white text-slate-600 hover:bg-slate-50')}>
+          <button key={s} onClick={() => list.setFilter('status', s)} className={cn('whitespace-nowrap rounded-full border px-3 py-1 text-[13px] font-medium', list.filters.status === s ? 'border-primary bg-primary text-white' : 'border-line bg-surface text-slate-600 hover:bg-slate-50')}>
             {label}{s && counts[s] ? <span className="ml-1.5 opacity-70">{counts[s]}</span> : null}
           </button>
         ))}

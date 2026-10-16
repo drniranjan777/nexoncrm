@@ -1,4 +1,8 @@
 @import 'tailwindcss';
+@import './theme-dark.css';
+
+/* `dark:` utilities follow the theme class on <html> (set by lib/theme.ts), not only the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -21,7 +25,18 @@
   --color-canvas: #f6f7f9;
   --color-line: #e6e8ec;
   --color-ink: #0f172a;
-  --color-muted: #64748b;
+  --color-muted: #5f6f85;
+
+  /* Solid fills that carry white text. They are not mirrored in dark mode, so the text stays readable. */
+  --color-primary: #1e3a8a;
+  --color-primary-hover: #172b63;
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+}
+
+:root.dark {
+  --color-primary: #3359dc;
+  --color-primary-hover: #2a4bc0;
 }
 
 @layer base {
@@ -44,11 +59,15 @@
 
 @utility scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: var(--color-slate-300) transparent;
 }
 
 @media print {
   .no-print {
     display: none !important;
+  }
+  :root.dark {
+    --color-primary: #1e3a8a;
+    --color-primary-hover: #172b63;
   }
 }

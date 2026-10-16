@@ -317,7 +317,7 @@ function StatementPanel({ customer }: { customer: Customer }) {
             <div><p className="text-xs text-muted">Opening balance</p><p className="font-semibold tabular-nums">{sm(q.data.opening)}</p></div>
             <div><p className="text-xs text-muted">Invoiced amount</p><p className="font-semibold tabular-nums">{sm(q.data.rows.reduce((s, r) => s + r.amount, 0))}</p></div>
             <div><p className="text-xs text-muted">Amount received</p><p className="font-semibold tabular-nums">{sm(q.data.rows.reduce((s, r) => s + r.payment, 0))}</p></div>
-            <div><p className="text-xs text-muted">Balance due</p><p className="font-semibold tabular-nums text-amber-600">{sm(q.data.closing)}</p></div>
+            <div><p className="text-xs text-muted">Balance due</p><p className="font-semibold tabular-nums text-amber-700">{sm(q.data.closing)}</p></div>
           </div>
           <Table><THead><tr><TH>Date</TH><TH>Transactions</TH><TH>Details</TH><TH className="text-right">Amount</TH><TH className="text-right">Payments</TH><TH className="text-right">Balance</TH></tr></THead><TBody>
             <tr><TD>{fmtDate(from)}</TD><TD>***Opening Balance***</TD><TD /><TD className="text-right tabular-nums">{sm(q.data.opening)}</TD><TD /><TD className="text-right tabular-nums">{sm(q.data.opening)}</TD></tr>
@@ -377,7 +377,7 @@ export function CustomerDetail() {
         <Card className="p-4"><p className="text-[13px] text-muted">Projects</p><p className="mt-1 text-xl font-semibold">{c.projects.length}</p></Card>
         <Card className="p-4"><p className="text-[13px] text-muted">Tickets</p><p className="mt-1 text-xl font-semibold">{c._count.tickets}</p></Card>
         {c.finance ? <>
-          <Card className="p-4"><p className="text-[13px] text-muted">Outstanding receivables</p><p className="mt-1 text-xl font-semibold tabular-nums text-amber-600">{inr(c.receivables ?? c.finance.balanceDue)}</p></Card>
+          <Card className="p-4"><p className="text-[13px] text-muted">Outstanding receivables</p><p className="mt-1 text-xl font-semibold tabular-nums text-amber-700">{inr(c.receivables ?? c.finance.balanceDue)}</p></Card>
           <Card className="p-4"><p className="text-[13px] text-muted">Unused credits</p><p className="mt-1 text-xl font-semibold tabular-nums">{inr(c.unusedCredits ?? 0)}</p></Card>
         </> : <Card className="p-4"><p className="text-[13px] text-muted">Feedback</p><p className="mt-1 text-xl font-semibold">{c._count.feedback}</p></Card>}
       </div>
@@ -490,11 +490,11 @@ function OnboardingChecklist({ customerId, items }: { customerId: string; items:
         {items.map((i) => (
           <li key={i.id} className="group flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-50">
             <button disabled={!can('customers.update')} onClick={() => toggle.mutate({ id: i.id, done: !i.doneAt })} aria-label={i.doneAt ? 'Mark not done' : 'Mark done'}>
-              {i.doneAt ? <CheckCircle2 className="size-5 text-emerald-600" /> : <Circle className="size-5 text-slate-300" />}
+              {i.doneAt ? <CheckCircle2 className="size-5 text-emerald-700" /> : <Circle className="size-5 text-slate-300" />}
             </button>
             <span className={i.doneAt ? 'flex-1 text-sm text-muted line-through' : 'flex-1 text-sm'}>{i.title}</span>
             {i.doneAt && <span className="text-xs text-muted">{fmtDate(i.doneAt)}</span>}
-            {can('customers.update') && <button className="invisible text-slate-400 hover:text-red-600 group-hover:visible" onClick={() => remove.mutate(i.id)} aria-label="Remove item"><Trash2 className="size-4" /></button>}
+            {can('customers.update') && <button className="invisible text-slate-500 hover:text-red-600 group-hover:visible" onClick={() => remove.mutate(i.id)} aria-label="Remove item"><Trash2 className="size-4" /></button>}
           </li>
         ))}
       </ul>

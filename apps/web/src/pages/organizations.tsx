@@ -44,7 +44,7 @@ export function OrganizationsPage() {
           const t = m.tenant as typeof m.tenant & { orgCode?: string | null; createdAt?: string };
           return (
             <Card key={m.id} className="relative flex flex-wrap items-center gap-6 overflow-hidden p-5">
-              {isDefault && <span className="absolute -left-8 top-3 w-28 -rotate-45 bg-emerald-500 py-0.5 text-center text-[10px] font-semibold uppercase text-white">Default</span>}
+              {isDefault && <span className="absolute -left-8 top-3 w-28 -rotate-45 bg-[#047857] py-0.5 text-center text-[10px] font-semibold uppercase text-white">Default</span>}
               <div className="flex size-28 items-center justify-center rounded-lg bg-slate-50"><TenantLogo tenant={t} className="max-h-16 max-w-24" /></div>
               <div className="min-w-0 flex-1 space-y-1 text-sm">
                 <p className="text-base font-semibold">{t.name}</p>
@@ -58,7 +58,7 @@ export function OrganizationsPage() {
                 <DropdownMenu.Root>
                   <DropdownMenu.Trigger asChild><Button variant="secondary" size="icon" aria-label="Organization actions"><MoreVertical /></Button></DropdownMenu.Trigger>
                   <DropdownMenu.Portal>
-                    <DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-44 rounded-xl border border-line bg-white p-1.5 shadow-lg">
+                    <DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-44 rounded-xl border border-line bg-surface p-1.5 shadow-lg">
                       <DropdownMenu.Item disabled={isDefault} onSelect={() => makeDefault(t.id)} className="cursor-pointer rounded-lg px-2.5 py-1.5 text-sm outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-slate-50">Mark as default</DropdownMenu.Item>
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>

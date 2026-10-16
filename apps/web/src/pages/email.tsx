@@ -38,7 +38,7 @@ function Recipients({ label, value, onChange, suggestions }: { label: string; va
           const c = suggestions.find((s) => s.email === e);
           return (
             <span key={e} className="flex items-center gap-1.5 rounded-md bg-slate-100 py-1 pl-1 pr-2 text-sm">
-              <span className="flex size-5 items-center justify-center rounded bg-white text-[10px] font-semibold uppercase text-slate-500">{(c?.name ?? e)[0]}</span>
+              <span className="flex size-5 items-center justify-center rounded bg-surface text-[10px] font-semibold uppercase text-slate-500">{(c?.name ?? e)[0]}</span>
               {c ? `${c.name} <${e}>` : `<${e}>`}
               <button onClick={() => onChange(value.filter((x) => x !== e))} aria-label={`Remove ${e}`}><X className="size-3.5 text-slate-400 hover:text-ink" /></button>
             </span>
@@ -74,7 +74,7 @@ function RichEditor({ html, onChange }: { html: string; onChange: (h: string) =>
         <button type="button" title="Insert link" aria-label="Insert link" className="rounded p-1.5 text-slate-600 hover:bg-slate-200" onMouseDown={(e) => { e.preventDefault(); const url = prompt('Link URL (https://...)'); if (url && /^https?:\/\//.test(url)) cmd('createLink', url); }}><Link2 className="size-4" /></button>
       </div>
       <div ref={ref} contentEditable suppressContentEditableWarning onInput={() => onChange(ref.current?.innerHTML ?? '')}
-        className="scrollbar-thin max-h-[560px] min-h-80 overflow-auto bg-white p-2 text-sm focus:outline-none" role="textbox" aria-multiline="true" aria-label="Email body" />
+        className="scrollbar-thin max-h-[560px] min-h-80 overflow-auto bg-surface p-2 text-sm focus:outline-none" role="textbox" aria-multiline="true" aria-label="Email body" />
     </div>
   );
 }
@@ -157,7 +157,7 @@ export function EmailComposePage() {
         {d.attachmentName && (
           <Card className="flex flex-wrap items-center gap-3 px-4 py-3">
             <Checkbox checked={attachPdf} onCheckedChange={setAttachPdf} id="pdf" /><label htmlFor="pdf" className="text-sm">Attach {docLabel} PDF</label>
-            <span className={cn('ml-auto flex items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm', !attachPdf && 'opacity-50')}><FileText className="size-4 text-red-500" />{d.attachmentName}</span>
+            <span className={cn('ml-auto flex items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm', !attachPdf && 'opacity-50')}><FileText className="size-4 text-red-600" />{d.attachmentName}</span>
             {pdfPath && <Button variant="secondary" size="sm" onClick={() => api.download(pdfPath, d.attachmentName ?? 'document.pdf', undefined, true).catch((e) => toast.error(errorMessage(e)))}>Preview PDF</Button>}
           </Card>
         )}
@@ -167,7 +167,7 @@ export function EmailComposePage() {
           {files.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{files.map((f) => <span key={f.id} className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-sm">{f.originalName}<button onClick={() => setFiles(files.filter((x) => x.id !== f.id))} aria-label="Remove"><X className="size-3.5" /></button></span>)}</div>}
         </Card>
       </div>
-      <div className="sticky bottom-0 -mx-4 mt-6 border-t border-line bg-white/95 px-4 py-3 backdrop-blur lg:-mx-8 lg:px-8">
+      <div className="sticky bottom-0 -mx-4 mt-6 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur lg:-mx-8 lg:px-8">
         <Button onClick={send} loading={sending}>Send</Button>
         <Button variant="ghost" className="ml-2" onClick={() => navigate(-1)}>Cancel</Button>
       </div>

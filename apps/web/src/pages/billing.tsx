@@ -160,7 +160,7 @@ export function ExpensesPage() {
               {list.data.items.map((e) => (
                 <TR key={e.id} onClick={() => setView(e)}>
                   <TD>{fmtDate(e.date)}</TD><TD className="font-medium">{e.category?.name ?? 'Uncategorised'}</TD><TD className="text-slate-600">{e.reference ?? ''}</TD><TD>{e.vendor ?? ''}</TD><TD>{titleCase(e.paidThrough)}</TD><TD>{e.customer?.name ?? ''}</TD>
-                  <TD>{e.invoice ? <span className="text-xs font-semibold text-emerald-600">INVOICED</span> : e.billable ? <span className="text-xs font-semibold text-amber-600">UNBILLED</span> : <span className="text-xs text-muted">NON-BILLABLE</span>}</TD>
+                  <TD>{e.invoice ? <span className="text-xs font-semibold text-emerald-700">INVOICED</span> : e.billable ? <span className="text-xs font-semibold text-amber-700">UNBILLED</span> : <span className="text-xs text-muted">NON-BILLABLE</span>}</TD>
                   <TD className="text-right tabular-nums">{inr(e.total)}</TD>
                   <TD className="py-1 text-right">
                     <MoreMenu compact items={[

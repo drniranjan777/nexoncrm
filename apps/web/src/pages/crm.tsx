@@ -349,11 +349,11 @@ export function LeadDetail() {
         </>} />
 
       {can('leads.update') && !closed && (
-        <div className="scrollbar-thin mb-6 flex overflow-x-auto rounded-xl border border-line bg-white">
+        <div className="scrollbar-thin mb-6 flex overflow-x-auto rounded-xl border border-line bg-surface">
           {STAGES.filter((s) => s !== 'ON_HOLD' && s !== 'LOST').map((s, i, arr) => {
             const idx = arr.indexOf(l.stage);
             return (
-              <button key={s} onClick={() => s !== l.stage && stage.mutate(s)} className={cn('flex-1 whitespace-nowrap border-r border-line px-3 py-2.5 text-xs font-medium last:border-0', i <= idx ? 'bg-brand-50 text-brand-800' : 'text-muted hover:bg-slate-50', s === l.stage && 'bg-brand-800 text-white hover:bg-brand-800')}>
+              <button key={s} onClick={() => s !== l.stage && stage.mutate(s)} className={cn('flex-1 whitespace-nowrap border-r border-line px-3 py-2.5 text-xs font-medium last:border-0', i <= idx ? 'bg-brand-50 text-brand-800' : 'text-muted hover:bg-slate-50', s === l.stage && 'bg-primary text-white hover:bg-primary')}>
                 {titleCase(s)}
               </button>
             );
@@ -466,7 +466,7 @@ export function Pipeline() {
               <div className="flex min-h-24 flex-col gap-2 px-2 pb-2">
                 {col.items.map((l) => (
                   <div key={l.id} draggable={can('leads.update')} onDragStart={() => setDragId(l.id)} onClick={() => navigate(`/leads/${l.id}`)}
-                    className={cn('cursor-pointer rounded-lg border border-line bg-white p-3 shadow-xs transition hover:border-brand-300', dragId === l.id && 'opacity-50')}>
+                    className={cn('cursor-pointer rounded-lg border border-line bg-surface p-3 shadow-xs transition hover:border-brand-300', dragId === l.id && 'opacity-50')}>
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-medium leading-snug">{l.name}</p><ScorePill score={l.score} />
                     </div>
@@ -475,7 +475,7 @@ export function Pipeline() {
                       <span>{l.estimatedValue ? inrCompact(l.estimatedValue) : '—'}</span>
                       <span className={l.nextFollowUpAt && new Date(l.nextFollowUpAt) < new Date() ? 'font-medium text-red-600' : ''}>{l.nextFollowUpAt ? fmtDate(l.nextFollowUpAt, { day: '2-digit', month: 'short' }) : ''}</span>
                     </div>
-                    <p className="mt-1 truncate text-[11px] text-slate-400">{memberName(members.data, l.assignedToId)}</p>
+                    <p className="mt-1 truncate text-[11px] text-slate-500">{memberName(members.data, l.assignedToId)}</p>
                   </div>
                 ))}
               </div>
@@ -501,7 +501,7 @@ export function FollowUps() {
   const tomorrow = new Date(today.getTime() + 86_400_000);
   const groups = [
     { label: 'Overdue', items: q.data?.items.filter((t) => t.dueDate && new Date(t.dueDate) < today) ?? [], tone: 'text-red-600' },
-    { label: 'Today', items: q.data?.items.filter((t) => t.dueDate && new Date(t.dueDate) >= today && new Date(t.dueDate) < tomorrow) ?? [], tone: 'text-amber-600' },
+    { label: 'Today', items: q.data?.items.filter((t) => t.dueDate && new Date(t.dueDate) >= today && new Date(t.dueDate) < tomorrow) ?? [], tone: 'text-amber-700' },
     { label: 'Upcoming', items: q.data?.items.filter((t) => !t.dueDate || new Date(t.dueDate) >= tomorrow) ?? [], tone: 'text-ink' },
   ];
   return (

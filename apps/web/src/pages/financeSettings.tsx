@@ -71,7 +71,7 @@ export function CurrencySettings() {
                 <tr key={c.code} className={cn(c.isDefault && 'bg-brand-50/50')}>
                   <TD>
                     <div className="flex items-center gap-3">
-                      <span className="flex h-8 w-12 shrink-0 items-center justify-center rounded-md border border-line bg-white text-xs font-bold tracking-wide">{c.code}</span>
+                      <span className="flex h-8 w-12 shrink-0 items-center justify-center rounded-md border border-line bg-surface text-xs font-bold tracking-wide">{c.code}</span>
                       <span className="min-w-0">
                         <span className="block text-sm font-medium">{c.name}</span>
                         <span className="flex gap-1">{c.isDefault && <Badge tone="blue">Default</Badge>}{c.isBase && <Badge tone="green">Base</Badge>}</span>
@@ -161,7 +161,7 @@ function ImageCard({ kind, fileId, onChanged }: { kind: 'seal' | 'signature'; fi
   }, { success: `${label} uploaded`, onSuccess: onChanged });
   const remove = useAction(() => api.delete(`/settings/authorization/${kind}`), { success: `${label} removed`, onSuccess: () => { setConfirm(false); onChanged(); } });
   return (
-    <div className="flex flex-col rounded-xl border border-line bg-white p-4">
+    <div className="flex flex-col rounded-xl border border-line bg-surface p-4">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex size-8 items-center justify-center rounded-full bg-brand-50 text-brand-700 [&_svg]:size-4">{kind === 'seal' ? <Stamp /> : <PenLine />}</span>
         <div><p className="text-sm font-semibold">{label}</p><p className="text-xs text-muted">{kind === 'seal' ? 'Transparent PNG recommended' : 'Signature on a transparent background'}</p></div>
@@ -235,7 +235,7 @@ function SignaturePreview({ a }: { a: Authorization }) {
     <div className="rounded-xl bg-slate-50 p-4">
       <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">Invoice preview</p>
       {nothing ? <p className="text-sm text-muted">Nothing is printed until you add a name, seal or signature, so documents don't show an empty block.</p> : (
-        <div className="ml-auto w-full max-w-xs rounded-lg border border-line bg-white p-4 text-right">
+        <div className="ml-auto w-full max-w-xs rounded-lg border border-line bg-surface p-4 text-right">
           <p className="text-sm font-semibold">For {a.companyName}</p>
           <div className="my-2 flex h-20 items-center justify-end gap-3">
             {a.showSealOnInvoice && seal && <img src={seal} alt="" className="max-h-20 max-w-20 object-contain" />}

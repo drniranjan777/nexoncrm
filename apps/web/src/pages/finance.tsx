@@ -31,9 +31,9 @@ export function MoreMenu({ items, compact }: { items: { label: string; icon?: ty
           : <Button variant="secondary" size="icon" aria-label="More actions"><MoreHorizontal /></Button>}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-48 rounded-xl border border-line bg-white p-1.5 shadow-lg">
+        <DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-48 rounded-xl border border-line bg-surface p-1.5 shadow-lg">
           {visible.map((i) => (
-            <DropdownMenu.Item key={i.label} onSelect={i.onSelect} className={cn('flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none data-[highlighted]:bg-slate-50', i.danger && 'text-red-600 data-[highlighted]:bg-red-50')}>
+            <DropdownMenu.Item key={i.label} onSelect={i.onSelect} className={cn('flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none data-[highlighted]:bg-slate-50', i.danger && 'text-red-600 data-[highlighted]:bg-red-50 data-[highlighted]:text-red-700')}>
               {i.icon && <i.icon className="size-4" />}{i.label}
             </DropdownMenu.Item>
           ))}
@@ -161,7 +161,7 @@ export function StatusTabs({ value, onChange, tabs }: { value: string; onChange:
   return (
     <div className="scrollbar-thin mb-4 flex gap-2 overflow-x-auto">
       {tabs.map(([v, label]) => (
-        <button key={v} onClick={() => onChange(v)} className={cn('whitespace-nowrap rounded-full border px-3 py-1 text-[13px] font-medium', value === v ? 'border-brand-700 bg-brand-800 text-white' : 'border-line bg-white text-slate-600 hover:bg-slate-50')}>{label}</button>
+        <button key={v} onClick={() => onChange(v)} className={cn('whitespace-nowrap rounded-full border px-3 py-1 text-[13px] font-medium', value === v ? 'border-primary bg-primary text-white' : 'border-line bg-surface text-slate-600 hover:bg-slate-50')}>{label}</button>
       ))}
     </div>
   );
@@ -263,7 +263,7 @@ export function InvoicesList() {
                     <TD>{i.customer?.company ?? i.customer?.name}</TD>
                     <TD>{overdueDays > 0 ? <Badge tone="red">Overdue by {overdueDays} days</Badge> : <StatusBadge status={i.status === 'CANCELLED' ? 'VOID' : i.status} />}</TD>
                     <TD className="text-slate-600">{fmtDate(i.dueDate)}</TD><TD className="text-right tabular-nums">{money(i.total, i.currency)}</TD>
-                    <TD className={cn('text-right font-medium tabular-nums', num(i.balanceDue) > 0 && !['DRAFT', 'CANCELLED'].includes(i.status) && 'text-amber-600')}>{['DRAFT', 'CANCELLED'].includes(i.status) ? '—' : money(i.balanceDue, i.currency)}</TD>
+                    <TD className={cn('text-right font-medium tabular-nums', num(i.balanceDue) > 0 && !['DRAFT', 'CANCELLED'].includes(i.status) && 'text-amber-700')}>{['DRAFT', 'CANCELLED'].includes(i.status) ? '—' : money(i.balanceDue, i.currency)}</TD>
                     <TD className="py-1 text-right">
                       <MoreMenu compact items={[
                         { label: 'Edit', icon: Pencil, onSelect: () => navigate(`/invoices/${i.id}/edit`), hidden: !invoiceEditable(i) || !can('invoices.create') },

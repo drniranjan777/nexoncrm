@@ -7,9 +7,9 @@ import { inr, inrCompact, titleCase, toDateInput } from '@/lib/utils';
 import { Card, CardHeader, EmptyState, ErrorState, Input, LoadingBlock, PageHeader, Stat, Table, TBody, TD, TH, THead } from '@/components/ui';
 
 const PALETTE = ['#1d42b8', '#3b6ef5', '#93b4fd', '#0f766e', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b', '#14b8a6'];
-const grid = <CartesianGrid vertical={false} stroke="#eef0f3" />;
-const axis = { tickLine: false, axisLine: false, fontSize: 12, stroke: '#64748b' } as const;
-const tooltipStyle = { borderRadius: 8, borderColor: '#e6e8ec', fontSize: 13 };
+const grid = <CartesianGrid vertical={false} stroke="var(--color-line)" />;
+const axis = { tickLine: false, axisLine: false, fontSize: 12, stroke: 'var(--color-muted)' } as const;
+const tooltipStyle = { borderRadius: 8, borderColor: 'var(--color-line)', background: 'var(--color-surface)', color: 'var(--color-ink)', fontSize: 13 };
 const month = (m: string) => new Date(`${m}-01`).toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
 
 function ChartCard({ title, description, children, empty, className }: { title: string; description?: string; children: ReactNode; empty?: boolean; className?: string }) {
@@ -25,12 +25,12 @@ function SimpleBar({ data, x, y, money, color = PALETTE[0], horizontal }: { data
   return horizontal ? (
     <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16 }}>
       {grid}<XAxis type="number" {...axis} tickFormatter={money ? (v) => inrCompact(v) : undefined} /><YAxis type="category" dataKey={x} {...axis} width={140} />
-      <Tooltip contentStyle={tooltipStyle} formatter={(v) => (money ? inr(v) : v)} cursor={{ fill: '#f1f5f9' }} /><Bar dataKey={y} fill={color} radius={[0, 4, 4, 0]} maxBarSize={22} />
+      <Tooltip contentStyle={tooltipStyle} formatter={(v) => (money ? inr(v) : v)} cursor={{ fill: 'var(--color-slate-100)' }} /><Bar dataKey={y} fill={color} radius={[0, 4, 4, 0]} maxBarSize={22} />
     </BarChart>
   ) : (
     <BarChart data={data} margin={{ left: 8, right: 8 }}>
       {grid}<XAxis dataKey={x} {...axis} /><YAxis {...axis} tickFormatter={money ? (v) => inrCompact(v) : undefined} width={money ? 64 : 32} allowDecimals={false} />
-      <Tooltip contentStyle={tooltipStyle} formatter={(v) => (money ? inr(v) : v)} cursor={{ fill: '#f1f5f9' }} /><Bar dataKey={y} fill={color} radius={[4, 4, 0, 0]} maxBarSize={40} />
+      <Tooltip contentStyle={tooltipStyle} formatter={(v) => (money ? inr(v) : v)} cursor={{ fill: 'var(--color-slate-100)' }} /><Bar dataKey={y} fill={color} radius={[4, 4, 0, 0]} maxBarSize={40} />
     </BarChart>
   );
 }
@@ -39,7 +39,7 @@ function Donut({ data, name, value }: { data: Record<string, unknown>[]; name: s
   return (
     <PieChart>
       <Pie data={data} dataKey={value} nameKey={name} innerRadius="55%" outerRadius="80%" paddingAngle={2}>{data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}</Pie>
-      <Tooltip contentStyle={tooltipStyle} /><Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+      <Tooltip contentStyle={tooltipStyle} /><Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} formatter={(v) => <span className="text-slate-600">{v}</span>} />
     </PieChart>
   );
 }

@@ -149,7 +149,7 @@ function ServerForm({ path, server, canStorePasswords, scope, onRemoved }: { pat
             {dirty && <p className="text-xs text-muted">Save your changes first, then send a test.</p>}
             {server.lastTestAt && (
               <p className="flex items-start gap-2 text-sm">
-                {server.lastTestOk ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" /> : <XCircle className="mt-0.5 size-4 shrink-0 text-red-600" />}
+                {server.lastTestOk ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-700" /> : <XCircle className="mt-0.5 size-4 shrink-0 text-red-600" />}
                 <span>{server.lastTestOk ? 'Last test succeeded' : `Last test failed: ${server.lastTestError}`} <span className="text-muted">· {fmtDateTime(server.lastTestAt)}</span></span>
               </p>
             )}

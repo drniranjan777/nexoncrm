@@ -48,7 +48,7 @@ export function CompanySettings() {
         <CardHeader title="Branding" />
         <div className="flex flex-wrap items-center gap-6 p-5">
           <div className="flex size-20 items-center justify-center overflow-hidden rounded-xl border border-line bg-slate-50">
-            {f.logoFileId ? <img src={`/api/v1/public/tenants/${q.data!.slug}/logo?v=${f.logoFileId}`} alt="Logo" className="max-h-full max-w-full object-contain" /> : <span className="text-2xl font-bold" style={{ color: f.brandColor }}>{f.name?.[0]}</span>}
+            {f.logoFileId ? <img src={`/api/v1/public/tenants/${q.data!.slug}/logo?v=${f.logoFileId}`} alt="Logo" className="max-h-full max-w-full object-contain" /> : <span className="flex size-full items-center justify-center text-2xl font-bold text-white" style={{ background: f.brandColor || '#1e3a8a' }}>{f.name?.[0]}</span>}
           </div>
           <div className="space-y-2">
             <input ref={logoInput} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadLogo.mutate(file); e.target.value = ''; }} />
@@ -395,7 +395,7 @@ export function IntegrationsSettings() {
           <ul className="divide-y divide-line">
             {q.data?.map((i) => (
               <li key={i.key} className="flex items-center gap-4 px-5 py-4">
-                {i.connected ? <CheckCircle2 className="size-5 text-emerald-600" /> : <XCircle className="size-5 text-slate-300" />}
+                {i.connected ? <CheckCircle2 className="size-5 text-emerald-700" /> : <XCircle className="size-5 text-slate-300" />}
                 <div className="flex-1"><p className="font-medium">{i.name}</p><p className="text-sm text-muted">{i.detail}</p></div>
                 <Badge tone={i.connected ? 'green' : 'gray'}>{i.connected ? 'Connected' : 'Not connected'}</Badge>
               </li>

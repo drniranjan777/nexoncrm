@@ -50,7 +50,7 @@ export function PortalHome() {
             <CardHeader title="Getting started" description={`${done} of ${d.customer.onboarding.length} steps complete`} />
             <div className="p-5">
               <Progress value={(done / d.customer.onboarding.length) * 100} className="mb-4" />
-              <ul className="space-y-2">{d.customer.onboarding.map((o) => <li key={o.id} className="flex items-center gap-2 text-sm">{o.doneAt ? <CheckCircle2 className="size-4 text-emerald-600" /> : <Circle className="size-4 text-slate-300" />}<span className={o.doneAt ? 'text-muted' : ''}>{o.title}</span></li>)}</ul>
+              <ul className="space-y-2">{d.customer.onboarding.map((o) => <li key={o.id} className="flex items-center gap-2 text-sm">{o.doneAt ? <CheckCircle2 className="size-4 text-emerald-700" /> : <Circle className="size-4 text-slate-300" />}<span className={o.doneAt ? 'text-muted' : ''}>{o.title}</span></li>)}</ul>
             </div>
           </Card>
         )}
@@ -80,7 +80,7 @@ export function PortalProject() {
       <Card>
         <CardHeader title="Milestones" description={`Started ${fmtDate(p.startDate)} · target ${fmtDate(p.dueDate)}`} />
         {!p.milestones.length ? <EmptyState title="Milestones will appear here" /> : (
-          <ol className="divide-y divide-line">{p.milestones.map((m) => <li key={m.id} className="flex items-center gap-3 px-5 py-3 text-sm">{m.status === 'DONE' ? <CheckCircle2 className="size-5 text-emerald-600" /> : <Circle className="size-5 text-slate-300" />}<span className="flex-1 font-medium">{m.title}</span><span className="text-muted">{fmtDate(m.dueDate)}</span></li>)}</ol>
+          <ol className="divide-y divide-line">{p.milestones.map((m) => <li key={m.id} className="flex items-center gap-3 px-5 py-3 text-sm">{m.status === 'DONE' ? <CheckCircle2 className="size-5 text-emerald-700" /> : <Circle className="size-5 text-slate-300" />}<span className="flex-1 font-medium">{m.title}</span><span className="text-muted">{fmtDate(m.dueDate)}</span></li>)}</ol>
         )}
       </Card>
       {p.files.length > 0 && (
