@@ -27,12 +27,18 @@ export interface NavGroup {
 export const NAV: NavGroup[] = [
   { label: 'Overview', fixed: true, items: [{ label: 'Home', to: '/', icon: LayoutDashboard, perms: ['dashboard.read'] }] },
   {
-    label: 'Customers',
+    label: 'Sales & Billing',
     items: [
-      { label: 'Customers', to: '/customers', icon: Building2, perms: ['customers.read'] },
-      { label: 'Contacts', to: '/contacts', icon: UsersRound, perms: ['customers.read'] },
-      { label: 'Customer Onboarding', to: '/onboarding', icon: ClipboardCheck, perms: ['customers.read'] },
-      { label: 'Feedback', to: '/feedback', icon: MessageSquareHeart, perms: ['feedback.read'], module: 'feedback' },
+      { label: 'Items', to: '/products', icon: Package, perms: ['products.manage'], module: 'finance' },
+      { label: 'Quotes', to: '/quotations', icon: FileText, perms: ['quotations.read'], module: 'finance' },
+      { label: 'Proforma Invoices', to: '/proforma-invoices', icon: FileCheck2, perms: ['proforma.read'], module: 'finance' },
+      { label: 'Invoices', to: '/invoices', icon: Receipt, perms: ['invoices.read'], module: 'finance' },
+      { label: 'Recurring Invoices', to: '/recurring-invoices', icon: Repeat, perms: ['invoices.read'], module: 'finance' },
+      { label: 'Payments Received', to: '/payments', icon: Wallet, perms: ['payments.read'], module: 'finance' },
+      { label: 'Credit Notes', to: '/credit-notes', icon: FileMinus, perms: ['invoices.read'], module: 'finance' },
+      { label: 'Expenses', to: '/expenses', icon: ReceiptIndianRupee, perms: ['invoices.read'], module: 'finance' },
+      { label: 'Tax Settings', to: '/settings/tax', icon: Percent, perms: ['settings.manage'], module: 'finance' },
+      { label: 'GST Filing', to: '/gst-filing', icon: Landmark, perms: ['reports.financial'], module: 'reports' },
     ],
   },
   {
@@ -46,18 +52,12 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: 'Sales & Billing',
+    label: 'Customers',
     items: [
-      { label: 'Items', to: '/products', icon: Package, perms: ['products.manage'], module: 'finance' },
-      { label: 'Quotes', to: '/quotations', icon: FileText, perms: ['quotations.read'], module: 'finance' },
-      { label: 'Proforma Invoices', to: '/proforma-invoices', icon: FileCheck2, perms: ['proforma.read'], module: 'finance' },
-      { label: 'Invoices', to: '/invoices', icon: Receipt, perms: ['invoices.read'], module: 'finance' },
-      { label: 'Recurring Invoices', to: '/recurring-invoices', icon: Repeat, perms: ['invoices.read'], module: 'finance' },
-      { label: 'Payments Received', to: '/payments', icon: Wallet, perms: ['payments.read'], module: 'finance' },
-      { label: 'Credit Notes', to: '/credit-notes', icon: FileMinus, perms: ['invoices.read'], module: 'finance' },
-      { label: 'Expenses', to: '/expenses', icon: ReceiptIndianRupee, perms: ['invoices.read'], module: 'finance' },
-      { label: 'Tax Settings', to: '/settings/tax', icon: Percent, perms: ['settings.manage'], module: 'finance' },
-      { label: 'GST Filing', to: '/gst-filing', icon: Landmark, perms: ['reports.financial'], module: 'reports' },
+      { label: 'Customers', to: '/customers', icon: Building2, perms: ['customers.read'] },
+      { label: 'Contacts', to: '/contacts', icon: UsersRound, perms: ['customers.read'] },
+      { label: 'Customer Onboarding', to: '/onboarding', icon: ClipboardCheck, perms: ['customers.read'] },
+      { label: 'Feedback', to: '/feedback', icon: MessageSquareHeart, perms: ['feedback.read'], module: 'feedback' },
     ],
   },
   {
